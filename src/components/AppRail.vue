@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { GitBranch, Moon, Settings, Ship, Sun } from "lucide-vue-next";
+import { GitBranch, Settings, Ship } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/stores/app";
-import { useTheme } from "@/composables/useTheme";
 
 export type View = "repos" | "settings";
 
@@ -11,7 +10,6 @@ const props = defineProps<{ view: View }>();
 const emit = defineEmits<{ navigate: [view: View] }>();
 
 const store = useAppStore();
-const { theme, toggle } = useTheme();
 
 const NAV_ITEMS: { view: View; label: string; icon: typeof Ship }[] = [
   { view: "repos", label: "仓库", icon: GitBranch },
@@ -53,18 +51,6 @@ function itemClass(view: View) {
         v-if="item.view === 'settings' && accountAlert"
         class="size-[7px] rounded-full bg-destructive"
       />
-    </button>
-
-    <div class="flex-1" />
-    <div class="mx-1 my-1.5 h-px bg-border" />
-
-    <button
-      class="flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-      @click="toggle"
-    >
-      <Sun v-if="theme === 'dark'" class="size-4" />
-      <Moon v-else class="size-4" />
-      {{ theme === "dark" ? "亮色模式" : "暗色模式" }}
     </button>
   </nav>
 </template>

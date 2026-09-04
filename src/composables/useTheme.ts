@@ -26,15 +26,19 @@ export function useTheme() {
     apply();
   }
 
-  function toggle() {
-    theme.value = theme.value === "dark" ? "light" : "dark";
+  function set(next: Theme) {
+    theme.value = next;
     try {
-      localStorage.setItem(THEME_KEY, theme.value);
+      localStorage.setItem(THEME_KEY, next);
     } catch {
       // 存储不可用时主题仍在本会话内生效
     }
     apply();
   }
 
-  return { theme, init, toggle };
+  function toggle() {
+    set(theme.value === "dark" ? "light" : "dark");
+  }
+
+  return { theme, init, set, toggle };
 }

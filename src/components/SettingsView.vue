@@ -2,11 +2,13 @@
 import { computed, ref } from "vue";
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/stores/app";
+import { useTheme } from "@/composables/useTheme";
 import AccountDialog from "./AccountDialog.vue";
 import StatusBadge from "./StatusBadge.vue";
 import type { AccountStatus, Platform } from "@/lib/types";
 
 const store = useAppStore();
+const { theme, set: setTheme } = useTheme();
 const maxDepth = ref(String(store.settings.max_depth));
 const accountDialog = ref<Platform | null>(null);
 const accountDialogVisible = computed({
@@ -94,6 +96,18 @@ async function addRoot() {
           默认深度内自动跳过 <code class="font-mono">node_modules</code>、隐藏目录与
           <code class="font-mono">.git</code> 内部。
         </p>
+      </section>
+
+      <section class="flex items-center justify-between">
+        <span class="text-sm">外观</span>
+        <select
+          class="h-8 rounded-md border border-input bg-background px-2 text-xs"
+          :value="theme"
+          @change="setTheme(($event.target as HTMLSelectElement).value as 'light' | 'dark')"
+        >
+          <option value="light">亮色</option>
+          <option value="dark">暗色</option>
+        </select>
       </section>
 
       <section class="flex items-center justify-between">
