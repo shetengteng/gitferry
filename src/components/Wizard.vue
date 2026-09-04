@@ -52,11 +52,13 @@ async function startScan() {
 }
 
 async function finish() {
-  for (const repo of found.value) {
-    if (selected.value.has(repo.path) !== repo.enabled) {
-      await store.setRepo(repo.path, selected.value.has(repo.path), repo.direction);
-    }
-  }
+  await store.setRepos(
+    found.value.map((repo) => ({
+      path: repo.path,
+      enabled: selected.value.has(repo.path),
+      direction: repo.direction,
+    })),
+  );
   await store.completeSetup();
 }
 </script>

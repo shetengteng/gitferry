@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::auth::{self, Platform};
@@ -10,6 +10,13 @@ use crate::error::{FerryError, FerryResult};
 use crate::{repo, scanner};
 
 pub type SharedConfig = Mutex<Config>;
+
+#[derive(Debug, Deserialize)]
+pub struct RepoConfigInput {
+    pub path: String,
+    pub enabled: bool,
+    pub direction: Direction,
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct AppStatePayload {
@@ -76,9 +83,10 @@ pub fn scan_repos(state: State<'_, SharedConfig>) -> FerryResult<Vec<RepoEntry>>
                 merged.push(old.clone());
             }
         }
-        config.repos = merged.clone();
-        tracing::info!(count = merged.len(), "扫描完成");
-        Ok(merged)
+        let result = merged.clone();
+        config.repos = merged;
+        tracing::info!(count = result.len(), "扫描完成");
+        Ok(result)
     })
 }
 
@@ -97,6 +105,25 @@ pub fn set_repo_config(
             .ok_or_else(|| FerryError::msg(format!("仓库未收录：{path}")))?;
         entry.enabled = enabled;
         entry.direction = direction;
+        Ok(())
+    })
+}
+
+#[tauri::command]
+pub fn set_repos_config(
+    state: State<'_, SharedConfig>,
+    items: Vec<RepoConfigInput>,
+) -> FerryResult<()> {
+    mutate(&state, |config| {
+        for item in &items {
+            let entry = config
+                .repos
+                .iter_mut()
+                .find(|r| r.path == PathBuf::from(&item.path))
+                .ok_or_else(|| FerryError::msg(format!("仓库未收录：{}", item.path)))?;
+            entry.enabled = item.enabled;
+            entry.direction = item.direction;
+        }
         Ok(())
     })
 }

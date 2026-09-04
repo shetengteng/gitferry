@@ -24,6 +24,12 @@ export function setRepoConfig(
   return invoke("set_repo_config", { path, enabled, direction });
 }
 
+export function setReposConfig(
+  items: { path: string; enabled: boolean; direction: Direction }[],
+): Promise<void> {
+  return invoke("set_repos_config", { items });
+}
+
 export function saveSettings(
   scanRoots: string[],
   maxDepth: number,

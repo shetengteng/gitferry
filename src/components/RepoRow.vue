@@ -48,7 +48,7 @@ function onDirection(value: unknown) {
 <template>
   <div
     class="flex flex-col gap-2 border-b px-4 py-3 transition-colors hover:bg-accent/50"
-    :class="{ 'bg-warning/5': repo.remotes.length === 0, 'opacity-45': !repo.enabled }"
+    :class="{ 'opacity-45': !repo.enabled }"
   >
     <div class="flex items-center gap-2">
       <Switch :model-value="repo.enabled" @update:model-value="onEnabled" />
@@ -76,7 +76,7 @@ function onDirection(value: unknown) {
         </SelectContent>
       </Select>
       <Input v-else class="h-7 w-40 text-[11px]" placeholder="先添加 remote（git remote add）" disabled />
-      <Button v-if="!repo.enabled" variant="ghost" size="sm" class="h-7">启用</Button>
+      <Button v-if="!repo.enabled" variant="ghost" size="sm" class="h-7" @click="onEnabled(true)">启用</Button>
     </div>
   </div>
 </template>

@@ -19,6 +19,7 @@ pub fn run() {
             commands::get_app_state,
             commands::scan_repos,
             commands::set_repo_config,
+            commands::set_repos_config,
             commands::save_settings,
             commands::configure_account,
             commands::complete_setup,

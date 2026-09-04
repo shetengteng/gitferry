@@ -74,6 +74,19 @@ export const useAppStore = defineStore("app", {
         repo.direction = direction;
       }
     },
+    async setRepos(
+      items: { path: string; enabled: boolean; direction: Direction }[],
+    ) {
+      await api.setReposConfig(items);
+      const byPath = new Map(items.map((i) => [i.path, i]));
+      for (const repo of this.repos) {
+        const item = byPath.get(repo.path);
+        if (item) {
+          repo.enabled = item.enabled;
+          repo.direction = item.direction;
+        }
+      }
+    },
     async saveSettings(scanRoots: string[], maxDepth: number) {
       this.settings = await api.saveSettings(scanRoots, maxDepth);
     },
