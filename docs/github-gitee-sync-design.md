@@ -41,6 +41,7 @@ src-tauri/src/
   scanner.rs              # 目录遍历发现 .git
   repo.rs                 # 读 .git/config 解析 remotes；归一化 URL 归属判定
   sync.rs                 # 同步引擎：fetch、ref 比较、push、冲突检测
+  auth.rs                 # 平台账号：PAT 存取（keyring）+ API 验证
   scheduler.rs            # 轮询定时器 + 队列（并发限流）
   config.rs               # 配置读写（~/Library/Application Support/gitferry/config.json）
   logging.rs              # tracing 滚动文件（~/Library/Logs/gitferry/app.log）
@@ -102,14 +103,27 @@ src-tauri/src/
 
 原则：**任何可能丢提交的操作（force、删除 ref）必须用户显式确认**；自动路径只做 fast-forward。
 
-## 6. 自动建仓（v2，可选）
+## 6. 账号与凭据（GitHub / Gitee 检测）
+
+设置页「账号」区块，每个平台一行：连接状态徽标 + 令牌配置入口。
+
+- **录入**：用户粘贴私人令牌（PAT）。GitHub 需 `repo` 权限，Gitee 需 `projects` 权限。
+- **存储**：令牌经 `keyring` crate 存入 macOS 钥匙串（服务名 `gitferry`，账户名 `github` / `gitee`）；`config.json` 只存平台用户名与状态，**绝不落盘令牌**。
+- **检测**：保存时调平台 API 验证并取回账号信息：
+  - GitHub：`GET https://api.github.com/user`（`Authorization: Bearer <token>`）
+  - Gitee：`GET https://gitee.com/api/v5/user?access_token=<token>`
+  - 成功则记 `{login, status: connected}`；401 → `invalid`（提示重建令牌）。
+- **状态**：`unconfigured` / `connected` / `invalid`。徽标显示在设置页；令牌失效时相关仓库错误文案指向账号页。
+- **用途**：① 识别"当前连接的账号是否拥有某仓库推送权"；② §7 自动建仓调 API；③ 轮询期轻量校验令牌（低频），失效主动告警而不是等 push 失败。
+
+### 6.1 自动建仓（依赖账号，v2）
 
 `gitee-only`/`github-only` 仓库开启另一侧方向时，目标仓库可能不存在：
 
 - Gitee：`POST https://gitee.com/api/v5/user/repos`（私人令牌，`projects` 权限）
 - GitHub：`POST https://api.github.com/user/repos`（PAT，`repo` 权限）
 
-令牌经 `keyring` crate 存入 macOS 钥匙串；UI 上是启用开关旁的「目标仓库不存在，一键创建」提示。v1 仅提示用户手动建仓。
+令牌经 `keyring` crate 存入 macOS 钥匙串（即 §6 已配置的账号令牌）；UI 上是启用开关旁的「目标仓库不存在，一键创建」提示。v1 仅提示用户手动建仓。
 
 ## 7. 常驻与自启
 
@@ -130,6 +144,7 @@ Rust 单测（`cargo test`）：
 |---|---|
 | `scanner` | 深度限制、`.git` 文件（worktree）、排除 `node_modules`、隐藏目录 |
 | `repo` | URL 归一化（`git@github.com:owner/repo.git`、`https://gitee.com/owner/repo`、带端口自定义 host）、`both` 分类 |
+| `auth` | 令牌写入/读出 keyring；验证 200→`connected`、401→`invalid`（HTTP 用 mock，不打真实 API） |
 | `sync` | 用本地 bare 仓库伪造两端：fast-forward 推送、tag 补推、分叉检测、tag 漂移拒推、镜像模式删 ref |
 | `scheduler` | 失败退避、并发限流 |
 
@@ -137,7 +152,7 @@ Rust 单测（`cargo test`）：
 
 ## 10. 里程碑
 
-1. **M1 扫描与列表**：`scanner` + `repo` + 仓库列表 UI + 配置持久化（无同步）。
+1. **M1 扫描与列表**：`scanner` + `repo` + `auth`（账号配置与检测）+ 仓库列表 UI + 设置 + 配置持久化（无同步）。
 2. **M2 同步引擎**：`sync.rs` 三方向 fast-forward 同步 + 手动触发 + 冲突检测。
 3. **M3 常驻自动化**：调度轮询、托盘、自启、日志。
 4. **M4 打磨**：镜像模式、退避、端到端打磨、打包 `.dmg`（`tauri-app` skill）。

@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+<meta charset="UTF-8">
+<title>GitFerry 原型 v1 · shadcn 风格</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ============ shadcn token（官方 dark preset + success/warning/info 扩展，与 launcher 一致） ============ */
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 98%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
+    --radius: 0.5rem;
+  }
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 98%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    padding: 40px 24px;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  .mono { font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace; }
+
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 8px; text-align: center; letter-spacing: -0.01em; }
+  .subtitle { color: hsl(var(--muted-foreground)); font-size: 13px; text-align: center; margin-bottom: 48px; }
+  .subtitle .accent { color: hsl(var(--success)); }
+
+  .screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 40px; max-width: 1560px; margin: 0 auto; }
+  .screen-group { display: flex; flex-direction: column; align-items: center; }
+  .screen-label { font-size: 11px; color: hsl(var(--muted-foreground)); margin-bottom: 14px; text-align: center; line-height: 1.6; letter-spacing: 0.02em; }
+  .screen-label .num { color: hsl(var(--success)); font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+
+  /* ============ 模拟桌面窗口 ============ */
+  .window {
+    width: 520px;
+    background: hsl(var(--card));
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--border));
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 38px -10px hsl(0 0% 0% / 0.35), 0 10px 20px -15px hsl(0 0% 0% / 0.2);
+    position: relative;
+  }
+  .window-main { height: 580px; }
+  .window-wizard { height: 480px; }
+  .window-modal { height: 400px; }
+
+  .titlebar {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    border-bottom: 1px solid hsl(var(--border));
+    background: hsl(var(--card));
+    flex-shrink: 0;
+    position: relative;
+  }
+  .traffic-lights { display: flex; gap: 8px; }
+  .light { width: 12px; height: 12px; border-radius: 50%; }
+  .light.close { background: #FF5F57; }
+  .light.minimize { background: #FEBC2E; }
+  .light.maximize { background: #28C840; }
+  .titlebar-title {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    font-size: 12px; color: hsl(var(--muted-foreground)); font-weight: 500;
+  }
+  .window-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ============ shadcn 组件：Button ============ */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    white-space: nowrap; border-radius: calc(var(--radius) - 2px);
+    font-size: 13px; font-weight: 500; height: 32px; padding: 0 14px;
+    border: 1px solid transparent; cursor: pointer;
+    transition: background-color 150ms, border-color 150ms, color 150ms;
+    outline: none; font-family: inherit;
+  }
+  .btn:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+  .btn-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+  .btn-primary:hover { background: hsl(var(--primary) / 0.9); }
+  .btn-secondary { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); }
+  .btn-secondary:hover { background: hsl(var(--secondary) / 0.8); }
+  .btn-outline { background: hsl(var(--background)); color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); }
+  .btn-outline:hover { background: hsl(var(--accent)); }
+  .btn-ghost { background: transparent; color: hsl(var(--foreground)); height: 30px; }
+  .btn-ghost:hover { background: hsl(var(--accent)); }
+  .btn-destructive { background: hsl(var(--destructive)); color: hsl(var(--destructive-foreground)); }
+  .btn-destructive:hover { background: hsl(var(--destructive) / 0.9); }
+  .btn-sm { height: 28px; padding: 0 10px; font-size: 12px; }
+
+  /* ============ shadcn 组件：Badge ============ */
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    border-radius: calc(var(--radius) - 2px); padding: 3px 9px;
+    font-size: 11px; font-weight: 500; border: 1px solid transparent; line-height: 1; white-space: nowrap;
+  }
+  .badge-secondary { background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground)); }
+  .badge-outline { background: transparent; color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); }
+  .badge-success { background: hsl(var(--success) / 0.12); color: hsl(var(--success)); border: 1px solid hsl(var(--success) / 0.25); }
+  .badge-warning { background: hsl(var(--warning) / 0.12); color: hsl(var(--warning)); border: 1px solid hsl(var(--warning) / 0.25); }
+  .badge-destructive { background: hsl(var(--destructive) / 0.12); color: hsl(var(--destructive)); border: 1px solid hsl(var(--destructive) / 0.25); }
+  .badge-info { background: hsl(var(--info) / 0.12); color: hsl(var(--info)); border: 1px solid hsl(var(--info) / 0.25); }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .badge .dot.pulse { animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+  /* ============ shadcn 组件：Input / Select / Switch ============ */
+  .input {
+    display: flex; height: 32px; width: 100%;
+    border-radius: calc(var(--radius) - 2px); border: 1px solid hsl(var(--input));
+    background: hsl(var(--background)); padding: 0 10px;
+    font-size: 12px; color: hsl(var(--foreground)); outline: none;
+    transition: border-color 150ms; font-family: inherit;
+  }
+  .input:focus { border-color: hsl(var(--ring)); box-shadow: 0 0 0 2px hsl(var(--ring) / 0.3); }
+
+  .select {
+    display: inline-flex; align-items: center; height: 28px;
+    border-radius: calc(var(--radius) - 2px); border: 1px solid hsl(var(--input));
+    background: hsl(var(--background)); padding: 0 26px 0 8px;
+    font-size: 12px; color: hsl(var(--foreground)); cursor: pointer; appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 7px center; outline: none;
+    font-family: inherit;
+  }
+  .select:focus { border-color: hsl(var(--ring)); }
+  .select-lg { height: 32px; padding-right: 30px; }
+
+  .switch { position: relative; display: inline-flex; width: 36px; height: 20px; flex-shrink: 0; cursor: pointer; }
+  .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .switch .track {
+    width: 100%; height: 100%; border-radius: 9999px;
+    background: hsl(var(--input)); transition: background-color 200ms;
+  }
+  .switch .thumb {
+    position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+    border-radius: 9999px; background: hsl(var(--background));
+    box-shadow: 0 1px 3px hsl(0 0% 0% / 0.4);
+    transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .switch input:checked + .track { background: hsl(var(--primary)); }
+  .switch input:checked + .track + .thumb { transform: translateX(16px); }
+
+  .checkbox {
+    width: 16px; height: 16px; border-radius: 4px;
+    border: 1px solid hsl(var(--input)); background: hsl(var(--background));
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;
+  }
+  .checkbox.checked { background: hsl(var(--primary)); border-color: hsl(var(--primary)); }
+  .checkbox svg { width: 12px; height: 12px; color: hsl(var(--primary-foreground)); }
+
+  /* ============ 主界面布局 ============ */
+  .toolbar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; border-bottom: 1px solid hsl(var(--border)); flex-shrink: 0;
+  }
+  .toolbar .search { flex: 1; }
+  .toolbar .spacer { flex: 1; }
+  .global-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: hsl(var(--muted-foreground)); }
+
+  .repo-list { flex: 1; overflow-y: auto; }
+  .repo-list::-webkit-scrollbar { width: 8px; }
+  .repo-list::-webkit-scrollbar-thumb { background: hsl(var(--muted)); border-radius: 4px; }
+
+  .repo-row {
+    padding: 12px 16px;
+    border-bottom: 1px solid hsl(var(--border));
+    display: flex; flex-direction: column; gap: 8px;
+    transition: background-color 120ms;
+  }
+  .repo-row:hover { background: hsl(var(--accent) / 0.5); }
+  .repo-row.conflict { background: hsl(var(--warning) / 0.05); }
+  .repo-row.disabled { opacity: 0.45; }
+  .repo-row-top { display: flex; align-items: center; gap: 8px; }
+  .repo-name { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
+  .repo-bottom { display: flex; align-items: center; gap: 8px; padding-left: 2px; }
+  .repo-path { flex: 1; font-size: 11px; color: hsl(var(--muted-foreground)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .repo-meta { font-size: 11px; color: hsl(var(--muted-foreground)); white-space: nowrap; }
+
+  .empty {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; color: hsl(var(--muted-foreground)); font-size: 13px; padding: 24px;
+  }
+  .empty svg { width: 36px; height: 36px; opacity: 0.4; }
+
+  .statusbar {
+    padding: 8px 16px; border-top: 1px solid hsl(var(--border));
+    font-size: 11px; color: hsl(var(--muted-foreground));
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+  }
+
+  /* ============ 向导 ============ */
+  .wizard-body { flex: 1; padding: 28px 24px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+  .wizard-title { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .wizard-desc { font-size: 12px; color: hsl(var(--muted-foreground)); line-height: 1.7; }
+  .root-chip {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border: 1px solid hsl(var(--border)); border-radius: calc(var(--radius) - 2px);
+    font-size: 12px; background: hsl(var(--background));
+  }
+  .root-chip .path { flex: 1; }
+  .root-chip .remove { color: hsl(var(--muted-foreground)); cursor: pointer; border: none; background: none; font-size: 14px; line-height: 1; }
+  .root-chip .remove:hover { color: hsl(var(--destructive)); }
+  .wizard-footer { padding: 14px 24px; border-top: 1px solid hsl(var(--border)); display: flex; justify-content: flex-end; gap: 8px; flex-shrink: 0; }
+  .scan-progress { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid hsl(var(--border)); border-radius: var(--radius); }
+  .scan-progress .line { display: flex; justify-content: space-between; font-size: 12px; }
+  .scan-progress .path { color: hsl(var(--muted-foreground)); font-size: 11px; }
+  .progress-track { height: 6px; border-radius: 9999px; background: hsl(var(--muted)); overflow: hidden; }
+  .progress-fill { height: 100%; width: 62%; border-radius: 9999px; background: hsl(var(--success)); animation: indet 1.6s ease-in-out infinite; }
+  @keyframes indet { 0% { margin-left: -20%; width: 40%; } 50% { margin-left: 40%; width: 50%; } 100% { margin-left: 100%; width: 30%; } }
+
+  .found-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border: 1px solid hsl(var(--border)); border-radius: calc(var(--radius) - 2px);
+    font-size: 12px;
+  }
+  .found-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; max-height: 200px; }
+  .found-row .name { flex: 1; font-weight: 500; }
+  .found-row .host { color: hsl(var(--muted-foreground)); font-size: 11px; }
+
+  /* ============ Dialog / 弹窗 ============ */
+  .overlay {
+    position: absolute; inset: 0; z-index: 20;
+    background: hsl(0 0% 0% / 0.6);
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(2px);
+  }
+  .dialog {
+    width: 420px; background: hsl(var(--card)); color: hsl(var(--card-foreground));
+    border: 1px solid hsl(var(--border)); border-radius: var(--radius);
+    box-shadow: 0 20px 50px -12px hsl(0 0% 0% / 0.6);
+    padding: 20px; display: flex; flex-direction: column; gap: 14px;
+  }
+  .dialog-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  .dialog-desc { font-size: 12px; color: hsl(var(--muted-foreground)); line-height: 1.7; }
+  .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+  .branch-conflict {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border: 1px solid hsl(var(--warning) / 0.3);
+    background: hsl(var(--warning) / 0.06);
+    border-radius: calc(var(--radius) - 2px); font-size: 12px;
+  }
+  .branch-conflict .mono { font-size: 11px; color: hsl(var(--muted-foreground)); }
+
+  /* ============ 设置 ============ */
+  .settings-body { flex: 1; padding: 20px 24px; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; }
+  .settings-section { display: flex; flex-direction: column; gap: 8px; }
+  .settings-label { font-size: 12px; font-weight: 600; }
+  .settings-hint { font-size: 11px; color: hsl(var(--muted-foreground)); line-height: 1.6; }
+  .form-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .form-row .label { font-size: 12px; }
+  .switch-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; border: 1px solid hsl(var(--border)); border-radius: calc(var(--radius) - 2px); }
+  .switch-row .label { font-size: 12px; font-weight: 500; }
+
+  /* ============ 托盘示意 ============ */
+  .menubar {
+    height: 26px; background: hsl(240 10% 6%);
+    display: flex; align-items: center; justify-content: flex-end; gap: 14px;
+    padding: 0 12px; font-size: 11px; color: hsl(var(--foreground)); border-bottom: 1px solid hsl(var(--border));
+  }
+  .menubar .tray { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 4px; background: hsl(var(--accent)); }
+  .tray-menu {
+    width: 210px; margin: 6px 12px 12px auto;
+    background: hsl(var(--popover)); color: hsl(var(--popover-foreground));
+    border: 1px solid hsl(var(--border)); border-radius: calc(var(--radius) - 2px);
+    box-shadow: 0 10px 30px -8px hsl(0 0% 0% / 0.5);
+    padding: 4px; font-size: 12px;
+  }
+  .tray-menu .item { display: flex; justify-content: space-between; align-items: center; padding: 5px 8px; border-radius: 4px; }
+  .tray-menu .item:hover { background: hsl(var(--accent)); }
+  .tray-menu .sep { height: 1px; background: hsl(var(--border)); margin: 4px 0; }
+  .tray-menu .muted { color: hsl(var(--muted-foreground)); font-size: 11px; }
+  .tray-menu .danger { color: hsl(var(--destructive)); }
+
+  /* ============ 状态机说明 ============ */
+  .notes { max-width: 1080px; margin: 56px auto 0; display: flex; flex-direction: column; gap: 20px; }
+  .note-card { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 20px 24px; }
+  .note-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+  .note-card p { font-size: 12px; color: hsl(var(--muted-foreground)); line-height: 1.8; }
+  .note-card pre {
+    font-family: 'JetBrains Mono', monospace; font-size: 11.5px; line-height: 1.8;
+    color: hsl(var(--foreground)); overflow-x: auto;
+  }
+  .note-card pre .c { color: hsl(var(--muted-foreground)); }
+  .note-card pre .s { color: hsl(var(--success)); }
+  .note-card pre .w { color: hsl(var(--warning)); }
+  .note-card pre .e { color: hsl(var(--destructive)); }
+</style>
+</head>
+<body>
+
+<h1>GitFerry <span style="color: hsl(var(--success))">·</span> 页面原型 v1</h1>
+<p class="subtitle">GitHub ⇄ Gitee 本地自动同步 · <span class="accent">dark</span> · shadcn token · 7 屏 + 状态机</p>
+
+<div class="screens">
+
+  <!-- ================= 01 首启向导 ================= -->
+  <div class="screen-group">
+    <div class="screen-label"><span class="num">01</span> 首次启动 · 选择扫描目录</div>
+    <div class="window window-wizard">
+      <div class="titlebar">
+        <div class="traffic-lights"><div class="light close"></div><div class="light minimize"></div><div class="light maximize"></div></div>
+        <div class="titlebar-title">GitFerry</div>
+      </div>
+      <div class="window-content">
+        <div class="wizard-body">
+          <div>
+            <div class="wizard-title">让 GitHub 与 Gitee 之间的同步自动发生</div>
+            <p class="wizard-desc" style="margin-top: 8px">
+              GitFerry 会扫描下方目录中的 git 仓库，识别 remote 归属（GitHub / Gitee），
+              按你为每个仓库设置的开关与方向，在后台定时自动同步。同步复用系统 git 与钥匙串凭据，不需要配置 webhook 或令牌。
+            </p>
+          </div>
+          <div class="settings-section">
+            <div class="settings-label">扫描目录</div>
+            <div class="root-chip">
+              <span class="path mono">~/Projects</span>
+              <button class="remove">×</button>
+            </div>
+            <div class="root-chip">
+              <span class="path mono">~/dev</span>
+              <button class="remove">×</button>
+            </div>
+            <div class="root-chip">
+              <span class="path mono">~/Documents</span>
+              <button class="remove">×</button>
+            </div>
+            <button class="btn btn-outline btn-sm" style="align-self: flex-start">＋ 添加目录…</button>
+            <p class="settings-hint">默认深度 4 层，自动跳过 <span class="mono">node_modules</span>、隐藏目录与 <span class="mono">.git</span> 内部。</p>
+          </div>
+        </div>
+        <div class="wizard-footer">
+          <button class="btn btn-primary">开始扫描</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 02 首启扫描中 ================= -->
+  <div class="screen-group">
+    <div class="screen-label"><span class="num">02</span> 首次启动 · 扫描结果确认</div>
+    <div class="window window-wizard">
+      <div class="titlebar">
+        <div class="traffic-lights"><div class="light close"></div><div class="light minimize"></div><div class="light maximize"></div></div>
+        <div class="titlebar-title">GitFerry</div>
+      </div>
+      <div class="window-content">
+        <div class="wizard-body">
+          <div class="scan-progress">
+            <div class="line"><span>扫描完成 · 发现 <b>23</b> 个 git 仓库</span><span class="path mono">~/dev</span></div>
+            <div class="progress-track"><div class="progress-fill"></div></div>
+            <div class="line"><span class="path mono">已识别 remote：GitHub 14 · Gitee 5 · 双端 4</span><span></span></div>
+          </div>
+          <div class="settings-section">
+            <div class="settings-label">选择要启用的仓库（可稍后在主界面逐个开启）</div>
+            <div class="found-list">
+              <div class="found-row">
+                <span class="checkbox checked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+                <span class="name">deepseek-harness-launcher</span>
+                <span class="host mono">github + gitee</span>
+              </div>
+              <div class="found-row">
+                <span class="checkbox checked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+                <span class="name">dotfiles</span>
+                <span class="host mono">github</span>
+              </div>
+              <div class="found-row">
+                <span class="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+                <span class="name">some-huge-repo</span>
+                <span class="host mono">github + gitee</span>
+              </div>
+              <div class="found-row">
+                <span class="checkbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+                <span class="name">temp-sandbox</span>
+                <span class="host mono">无 remote</span>
+              </div>
+            </div>
+            <p class="settings-hint">无 remote 或仅单端 remote 的仓库也可以启用——同步方向若指向不存在的目标仓库，会提示先创建。</p>
+          </div>
+        </div>
+        <div class="wizard-footer">
+          <button class="btn btn-ghost">稍后再说</button>
+          <button class="btn btn-primary">启用所选并完成</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 03 主界面·空闲 ================= -->
+  <div class="screen-group">
+    <div class="screen-label"><span class="num">03</span> 主界面 · 仓库列表（空闲）</div>
+    <div class="window window-main">
+      <div class="titlebar">
+        <div class="traffic-lights"><div class="light close"></div><div class="light minimize"></div><div class="light maximize"></div></div>
+        <div class="titlebar-title">GitFerry</div>
+      </div>
+      <div class="window-content">
+        <div class="toolbar">
+          <input class="input search" placeholder="搜索仓库名或路径…">
+          <button class="btn btn-outline btn-sm">重新扫描</button>
+          <button class="btn btn-ghost btn-sm">设置</button>
+        </div>
+        <div class="repo-list">
+          <div class="repo-row">
+            <div class="repo-row-top">
+              <label class="switch"><input type="checkbox" checked><span class="track"></span><span class="thumb"></span></label>
+              <span class="repo-name">deepseek-harness-launcher</span>
+              <span class="badge badge-secondary">双端</span>
+              <span style="flex:1"></span>
+              <span class="badge badge-success"><span class="dot"></span>已同步</span>
+            </div>
+            <div class="repo-bottom">
+              <span class="repo-path mono">~/Projects/deepseek-harness-launcher</span>
+              <select class="select">
+                <option selected>双向</option>
+                <option>GitHub → Gitee</option>
+                <option>Gitee → GitHub</option>
+              </select>
+              <span class="repo-meta">2 分钟前</span>
+            </div>
+          </div>
+          <div class="repo-row">
+            <div class="repo-row-top">
+              <label class="switch"><input type="checkbox" checked><span class="track"></span><span class="thumb"></span></label>
+              <span class="repo-name">blog</span>
+              <span class="badge badge-secondary">Gitee</span>
+              <span style="flex:1"></span>
+              <span class="badge badge-warning"><span class="dot"></span>待同步 · 2 分支</span>
+            </div>
+            <div class="repo-bottom">
+              <span class="repo-path mono">~/Projects/blog</span>
+              <select class="select">
+                <option>双向</option>
+                <option>GitHub → Gitee</option>
+                <option selected>Gitee → GitHub</option>
+              </select>
+              <span class="repo-meta">10 分钟前</span>
+            </div>
+          </div>
+          <div class="repo-row conflict">
+            <div class="repo-row-top">
+              <label class="switch"><input type="checkbox" checked><span class="track"></span><span class="thumb"></span></label>
+              <span class="repo-name">machine-learning-notes</span>
+              <span class="badge badge-secondary">双端</span>
+              <span style="flex:1"></span>
+              <span class="badge badge-destructive"><span class="dot pulse"></span>冲突 · main</span>
+            </div>
+            <div class="repo-bottom">
+              <span class="repo-path mono">~/dev/machine-learning-notes</span>
+              <select class="select">
+                <option selected>双向</option>
+                <option>GitHub → Gitee</option>
+                <option>Gitee → GitHub</option>
+              </select>
+              <span class="repo-meta">暂停同步</span>
+            </div>
+          </div>
+          <div class="repo-row">
+            <div class="repo-row-top">
+              <label class="switch"><input type="checkbox" checked><span class="track"></span><span class="thumb"></span></label>
+              <span class="repo-name">dotfiles</span>
+              <span class="badge badge-secondary">GitHub</span>
+              <span style="flex:1"></span>
+              <span class="badge badge-destructive"><span class="dot pulse"></span>错误</span>
+            </div>
+            <div class="repo-bottom">
+              <span class="repo-path mono">~/Projects/dotfiles</span>
+              <select class="select">
+                <option selected>GitHub → Gitee</option>
+                <option>Gitee → GitHub</option>
+                <option>双向</option>
+              </select>
+              <span class="repo-meta">需要凭据</span>
+            </div>
+          </div>
+          <div class="repo-row disabled">
+            <div class="repo-row-top">
+              <label class="switch"><input type="checkbox"><span class="track"></span><span class="thumb"></span></label>
+              <span class="repo-name">some-huge-repo</span>
+              <span class="badge badge-secondary">双端</span>
+              <span style="flex:1"></span>
+              <span class="badge badge-outline">未启用</span>
+            </div>
+            <div class="repo-bottom">
+              <span class="repo-path mono">~/dev/some-huge-repo</span>
+              <select class="select">
+                <option selected>双向</option>
+                <option>GitHub → Gitee</option>
+                <option>Gitee → GitHub</option>
+              </select>
+              <span class="repo-meta">—</span>
+            </div>
+          </div>
+        </div>
+        <div class="statusbar">
+          <span>4 个启用 · 上次全量同步 14:32</span>
+          <span class="mono">10 分钟后自动同步</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 04 同步中 ================= -->
+  <div class="screen-group">
+    <div class="screen-label"><span class="num">04</span> 主界面 · 同步进行中</div>
+    <div class="window window-main">
+      <div class="titlebar">
+        <div class="traffic-lights"><div class="light close"></div><div class="light minimize"></div><div class="light maximize"></div></div>
+        <div class="titlebar-title">GitFerry</div>
+      </div>
+      <div class="window-content">
+        <div class="toolbar">
+          <input class="input search" placeholder="搜索仓库名或路径…" value="deepseek">
+          <button class="btn btn-primary btn-sm">立即全量同步</button>
+        </div>
+        <div class="repo-list">
+          <div class="repo-row">
+            <div class="repo-row-top">
+              <label class="switch"><input type="checkbox" checked><span class="track"></span><span class="thumb"></span></label>
+              <span class="repo-name">deepseek-harness-launcher</span>
+              <span class="badge badge-secondary">双端</span>
+              <span style="flex:1"></span>
+              <span class="badge badge-info"><span class="dot pulse"></span>同步中</span>
+            </div>
+            <div class="repo-bottom">
+              <span class="repo-path mono">git fetch origin && gitee · push 3 refs…</span>
+              <span class="repo-meta">刚刚</span>
+            </div>
+          </div>
+          <div class="repo-row">
+            <div class="repo-row-top">
+              <label class="switch"><input type="checkbox" checked><span class="track"></span><span class="thumb"></span></label>
+              <span class="repo-name">deepseek-harness-launcher-design</span>
+              <span class="badge badge-secondary">GitHub</span>
+              <span style="flex:1"></span>
+              <span class="badge badge-success"><span class="dot"></span>已同步</span>
+            </div>
+            <div class="repo-bottom">
+              <span class="repo-path mono">~/dev/deepseek-harness-launcher-design</span>
+              <select class="select">
+                <option selected>双向</option>
+                <option>GitHub → Gitee</option>
+                <option>Gitee → GitHub</option>
+              </select>
+              <span class="repo-meta">1 分钟前</span>
+            </div>
+          </div>
+        </div>
+        <div class="statusbar">
+          <span>同步中 · 1/4 仓库</span>
+          <span class="mono">并发 2</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 05 冲突弹窗 ================= -->
+  <div class="screen-group">
+    <div class="screen-label"><span class="num">05</span> 冲突裁决弹窗（数据安全底线）</div>
+    <div class="window window-modal">
+      <div class="titlebar">
+        <div class="traffic-lights"><div class="light close"></div><div class="light minimize"></div><div class="light maximize"></div></div>
+        <div class="titlebar-title">GitFerry</div>
+      </div>
+      <div class="window-content" style="position: relative">
+        <div class="overlay">
+          <div class="dialog">
+            <div class="dialog-title">检测到分支分叉</div>
+            <p class="dialog-desc">
+              <b class="mono" style="font-size:12px">machine-learning-notes</b> 的以下分支在 GitHub 与 Gitee 各有新提交，
+              自动同步已暂停。选择权威一侧后将以强制推送对齐；或先在本地手动合并。
+            </p>
+            <div class="branch-conflict">
+              <span class="mono">main</span>
+              <span style="flex:1"></span>
+              <span class="mono">GitHub a1b2c3d · Gitee e4f5g6h</span>
+            </div>
+            <div class="branch-conflict">
+              <span class="mono">docs/api</span>
+              <span style="flex:1"></span>
+              <span class="mono">GitHub 9f8e7d6 · Gitee 5c4b3a2</span>
+            </div>
+            <div class="dialog-actions">
+              <button class="btn btn-outline">稍后处理</button>
+              <button class="btn btn-outline">以 Gitee 为准</button>
+              <button class="btn btn-destructive">以 GitHub 为准</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 06 设置 ================= -->
+  <div class="screen-group">
+    <div class="screen-label"><span class="num">06</span> 设置</div>
+    <div class="window window-wizard">
+      <div class="titlebar">
+        <div class="traffic-lights"><div class="light close"></div><div class="light minimize"></div><div class="light maximize"></div></div>
+        <div class="titlebar-title">GitFerry · 设置</div>
+      </div>
+      <div class="window-content">
+        <div class="settings-body">
+          <div class="settings-section">
+            <div class="settings-label">账号</div>
+            <div class="switch-row">
+              <span class="label">GitHub <span class="badge badge-success" style="margin-left:6px"><span class="dot"></span>已连接 @shetengteng</span></span>
+              <button class="btn btn-outline btn-sm">更新令牌</button>
+            </div>
+            <div class="switch-row">
+              <span class="label">Gitee <span class="badge badge-warning" style="margin-left:6px"><span class="dot pulse"></span>令牌失效</span></span>
+              <button class="btn btn-outline btn-sm">重新配置</button>
+            </div>
+            <p class="settings-hint">令牌保存在 macOS 钥匙串，GitFerry 不落盘明文。GitHub 需 <span class="mono">repo</span> 权限，Gitee 需 <span class="mono">projects</span> 权限，用于账号检测与目标仓库自动创建。</p>
+          </div>
+          <div class="settings-section">
+            <div class="settings-label">扫描目录</div>
+            <div class="root-chip"><span class="path mono">~/Projects</span><button class="remove">×</button></div>
+            <div class="root-chip"><span class="path mono">~/dev</span><button class="remove">×</button></div>
+            <div class="root-chip"><span class="path mono">~/Documents</span><button class="remove">×</button></div>
+            <button class="btn btn-outline btn-sm" style="align-self: flex-start">＋ 添加目录…</button>
+          </div>
+          <div class="form-row">
+            <span class="label">扫描深度</span>
+            <select class="select select-lg"><option>3 层</option><option selected>4 层</option><option>5 层</option></select>
+          </div>
+          <div class="form-row">
+            <span class="label">自动同步间隔</span>
+            <select class="select select-lg"><option>5 分钟</option><option selected>10 分钟</option><option>30 分钟</option><option>1 小时</option><option>6 小时</option></select>
+          </div>
+          <div class="form-row">
+            <span class="label">并发同步数</span>
+            <select class="select select-lg"><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
+          </div>
+          <div class="switch-row">
+            <span class="label">登录时自动启动 GitFerry</span>
+            <label class="switch"><input type="checkbox" checked><span class="track"></span><span class="thumb"></span></label>
+          </div>
+          <div class="switch-row">
+            <span class="label">关闭窗口时保留在菜单栏 <span class="settings-hint" style="display:inline">（取消则直接退出）</span></span>
+            <label class="switch"><input type="checkbox" checked><span class="track"></span><span class="thumb"></span></label>
+          </div>
+        </div>
+        <div class="wizard-footer" style="justify-content: space-between">
+          <button class="btn btn-ghost btn-sm">打开日志目录</button>
+          <button class="btn btn-primary">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 07 托盘 ================= -->
+  <div class="screen-group">
+    <div class="screen-label"><span class="num">07</span> 菜单栏托盘（常驻与快捷操作）</div>
+    <div class="window" style="width: 260px; height: auto">
+      <div class="menubar">
+        <span>◇</span>
+        <span class="tray">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 17c1.5-1.5 3-2 4.5-2S10 15.5 12 17s3 2 4.5 2S19 18.5 21 17"/>
+            <path d="M12 4v9"/><path d="M12 6l6 6"/><path d="M12 6l-6 6"/>
+          </svg>
+        </span>
+        <span>⌁</span>
+      </div>
+      <div style="padding: 4px"></div>
+      <div class="tray-menu">
+        <div class="item muted"><span>4 个启用 · 全部已同步</span></div>
+        <div class="item muted"><span>冲突 1 · 错误 1</span></div>
+        <div class="sep"></div>
+        <div class="item"><span>立即全量同步</span><span class="muted mono">⇧⌘S</span></div>
+        <div class="item"><span>打开主窗口</span></div>
+        <div class="sep"></div>
+        <div class="item"><span>设置…</span><span class="muted mono">⌘,</span></div>
+        <div class="item danger"><span>退出 GitFerry</span><span class="muted mono">⌘Q</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 08 账号令牌 ================= -->
+  <div class="screen-group">
+    <div class="screen-label"><span class="num">08</span> 账号令牌配置（钥匙串存储 + API 检测）</div>
+    <div class="window window-modal">
+      <div class="titlebar">
+        <div class="traffic-lights"><div class="light close"></div><div class="light minimize"></div><div class="light maximize"></div></div>
+        <div class="titlebar-title">GitFerry</div>
+      </div>
+      <div class="window-content" style="position: relative">
+        <div class="overlay">
+          <div class="dialog">
+            <div class="dialog-title">配置 Gitee 账号</div>
+            <p class="dialog-desc">
+              在 Gitee「设置 → 安全设置 → 私人令牌」生成令牌，勾选 <span class="mono">projects</span> 权限。
+              保存后 GitFerry 会调用 <span class="mono">api/v5/user</span> 验证并显示账号。令牌只存 macOS 钥匙串。
+            </p>
+            <div>
+              <input class="input mono" type="password" placeholder="粘贴私人令牌（personal access token）" value="·····························">
+            </div>
+            <div class="branch-conflict" style="border-color: hsl(var(--success) / 0.3); background: hsl(var(--success) / 0.06)">
+              <span class="badge badge-success"><span class="dot"></span>验证通过</span>
+              <span style="flex:1"></span>
+              <span class="mono">已连接 @shetengteng</span>
+            </div>
+            <div class="dialog-actions">
+              <button class="btn btn-outline">取消</button>
+              <button class="btn btn-primary">保存并验证</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ================= 状态机与文案 ================= -->
+<div class="notes">
+  <div class="note-card">
+    <h3>仓库状态机</h3>
+    <pre>
+idle <span class="c">──启用了同步──▶</span> checking <span class="c">──fetch 两端比较──▶</span> <span class="s">synced</span> <span class="c">（无差异，更新 last_synced）</span>
+                        │ 有差异（领先侧可 fast-forward）
+                        ▼
+                    syncing <span class="c">──push 成功──▶</span> <span class="s">synced</span>
+                        │ push [rejected]（分叉）
+                        ▼
+                    <span class="w">conflict</span> <span class="c">──用户三选一（以某侧为准 / 稍后）──▶</span> syncing
+                        │ 凭证失败 / 网络 / 仓库缺失
+                        ▼
+                     <span class="e">error</span> <span class="c">──指数退避（3 次后 3× 间隔）──▶</span> checking
+
+<span class="c">全局任意时刻：</span>idle / syncing(N/M) / conflict(≥1) / error(≥1)
+<span class="c">路径失效：</span>任意状态 ──仓库目录不存在──▶ <span class="e">missing</span> <span class="c">（暂停轮询，保留配置，重新扫描可恢复）</span>
+
+<span class="c">账号状态（每平台）：</span><span class="e">unconfigured</span> ──保存令牌+API 验证──▶ <span class="s">connected</span> ──401──▶ <span class="w">invalid</span>
+<span class="c">connected / invalid 都会反映到依赖它的仓库错误文案与自动建仓可用性。</span>
+    </pre>
+  </div>
+
+  <div class="note-card">
+    <h3>同步流水线（每仓库）</h3>
+    <pre>
+1. git fetch <span class="c">&lt;两端&gt;</span> --prune                        <span class="c"># 只更新 remote-tracking，不动工作区</span>
+2. 逐分支比较 src-sha / dst-sha                     <span class="c"># refs/heads/*</span>
+   ├─ dst 缺分支 / dst 是 src 祖先  → push 领先侧（无 --force）
+   ├─ src 是 dst 祖先              → 跳过
+   └─ 分叉                          → conflict，暂停该分支
+3. 逐 tag 比较                                      <span class="c"># refs/tags/*：缺则补推；已存在不覆盖</span>
+4. 结果写入状态与 last_synced，日志一条记录
+<span class="c">红线：自动路径绝不 --force、绝不删 ref；镜像模式与强制对齐必须用户显式确认。</span>
+    </pre>
+  </div>
+
+  <div class="note-card">
+    <h3>文案规范（所有错误给可操作提示）</h3>
+    <p>
+      凭据失败：<b>「gitee push 被拒：钥匙串中没有该仓库的凭据。请在终端对该仓库执行一次
+      <span class="mono">git push</span> 以保存凭据，然后重试。」</b><br>
+      目标仓库不存在：<b>「gitee.com 上还没有同名仓库。请先在 Gitee 创建空仓库（不要初始化 README），或在设置中更换方向。」</b><br>
+      单文件超限：<b>「推送失败：仓库中存在超过 100MB 的文件，Gitee 不支持。可启用 Git-LFS 或排除该文件。」</b><br>
+      分叉：<b>「两端各有新提交，GitFerry 不会自动覆盖任何一侧。请选择权威一侧或手动合并。」</b>
+    </p>
+  </div>
+
+  <div class="note-card">
+    <h3>组件对照（正式实现）</h3>
+    <p>
+      列表行 → <span class="mono">Card + Switch + Select + Badge</span>（shadcn-vue）·
+      冲突弹窗 → <span class="mono">AlertDialog</span> ·
+      设置 → <span class="mono">Sheet / Dialog + Input + Switch</span> ·
+      首启向导 → <span class="mono">Stepper + Checkbox</span> ·
+      搜索 → <span class="mono">Input</span>（前端过滤）·
+      状态提示 → <span class="mono">Sonner（toast）</span>。
+      Token 与本原型一致（官方 dark preset + success/warning/info 扩展）。
+    </p>
+  </div>
+</div>
+
+</body>
+</html>

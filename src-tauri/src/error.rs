@@ -6,6 +6,8 @@ pub enum FerryError {
     Io(#[from] std::io::Error),
     #[error("配置读写失败: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("钥匙串访问失败: {0}")]
+    Keyring(#[from] keyring::Error),
     #[error("{0}")]
     Message(String),
 }
