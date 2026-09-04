@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -57,9 +56,6 @@ function onDirection(value: unknown) {
       <Badge v-for="r in repo.remotes" :key="r.name + r.url" variant="outline" class="max-w-40 truncate font-mono text-[10px] font-normal">
         {{ r.name }}
       </Badge>
-      <span class="flex-1" />
-      <span v-if="repo.enabled" class="text-[11px] text-muted-foreground">等待首次同步</span>
-      <span v-else class="text-[11px] text-muted-foreground">未启用</span>
     </div>
     <div class="flex items-center gap-2 pl-2">
       <span class="flex-1 truncate font-mono text-[11px] text-muted-foreground">{{ repo.path }}</span>
@@ -76,7 +72,6 @@ function onDirection(value: unknown) {
         </SelectContent>
       </Select>
       <Input v-else class="h-7 w-40 text-[11px]" placeholder="先添加 remote（git remote add）" disabled />
-      <Button v-if="!repo.enabled" variant="ghost" size="sm" class="h-7" @click="onEnabled(true)">启用</Button>
     </div>
   </div>
 </template>
