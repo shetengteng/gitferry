@@ -73,9 +73,7 @@ pub fn parse_verify_response(status: u16, body: &str) -> VerifyOutcome {
                 login: Option<String>,
             }
             match serde_json::from_str::<User>(body) {
-                Ok(user) if user.login.is_some() => {
-                    VerifyOutcome::Connected(user.login.unwrap())
-                }
+                Ok(user) if user.login.is_some() => VerifyOutcome::Connected(user.login.unwrap()),
                 _ => VerifyOutcome::Unexpected("响应缺少 login 字段".to_string()),
             }
         }
@@ -113,7 +111,10 @@ mod tests {
             parse_verify_response(200, r#"{"login":"shetengteng","id":1}"#),
             VerifyOutcome::Connected("shetengteng".into())
         );
-        assert_eq!(parse_verify_response(401, r#"{"message":"Bad credentials"}"#), VerifyOutcome::Unauthorized);
+        assert_eq!(
+            parse_verify_response(401, r#"{"message":"Bad credentials"}"#),
+            VerifyOutcome::Unauthorized
+        );
         assert!(matches!(
             parse_verify_response(500, "boom"),
             VerifyOutcome::Unexpected(_)

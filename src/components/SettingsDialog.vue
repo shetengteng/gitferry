@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,7 +11,8 @@ import {
 } from "@/components/ui/dialog";
 import { useAppStore } from "@/stores/app";
 import AccountDialog from "./AccountDialog.vue";
-import type { Platform } from "@/lib/types";
+import StatusBadge from "./StatusBadge.vue";
+import type { AccountStatus, Platform } from "@/lib/types";
 
 const open = defineModel<boolean>("open", { required: true });
 
@@ -26,28 +26,18 @@ const accountDialogVisible = computed({
   },
 });
 
-const ACCOUNT_STATUS: Record<string, { variant: "success" | "warning" | "secondary"; label: string }> = {
-  unconfigured: { variant: "secondary", label: "未配置" },
-  connected: { variant: "success", label: "已连接" },
-  invalid: { variant: "warning", label: "令牌失效" },
+const ACCOUNT_STATUS: Record<AccountStatus, { tone: "success" | "warning" | "secondary"; label: string }> = {
+  unconfigured: { tone: "secondary", label: "未配置" },
+  connected: { tone: "success", label: "已连接" },
+  invalid: { tone: "warning", label: "令牌失效" },
 };
 
 async function addRoot() {
   const { open: pick } = await import("@tauri-apps/plugin-dialog");
   const selected = await pick({ directory: true, multiple: false });
   if (typeof selected === "string") {
-    const roots = [...new Set([...store.settings.scan_roots, selected])];
-    await store.saveSettings(roots, Number(maxDepth.value));
+    await store.addScanRoot(selected);
   }
-}
-
-async function removeRoot(root: string) {
-  const roots = store.settings.scan_roots.filter((r) => r !== root);
-  await store.saveSettings(roots, Number(maxDepth.value));
-}
-
-async function changeDepth() {
-  await store.saveSettings([...store.settings.scan_roots], Number(maxDepth.value));
 }
 </script>
 
@@ -65,10 +55,10 @@ async function changeDepth() {
           <div class="flex items-center justify-between rounded-md border px-3 py-2">
             <span class="flex items-center gap-2 text-sm font-medium">
               GitHub
-              <Badge :variant="ACCOUNT_STATUS[store.accounts.github.status].variant">
+              <StatusBadge :tone="ACCOUNT_STATUS[store.accounts.github.status].tone">
                 {{ ACCOUNT_STATUS[store.accounts.github.status].label
                 }}{{ store.accounts.github.login ? ` @${store.accounts.github.login}` : "" }}
-              </Badge>
+              </StatusBadge>
             </span>
             <Button variant="outline" size="sm" @click="accountDialog = 'github'">
               {{ store.accounts.github.status === "unconfigured" ? "配置令牌" : "更新令牌" }}
@@ -77,10 +67,10 @@ async function changeDepth() {
           <div class="flex items-center justify-between rounded-md border px-3 py-2">
             <span class="flex items-center gap-2 text-sm font-medium">
               Gitee
-              <Badge :variant="ACCOUNT_STATUS[store.accounts.gitee.status].variant">
+              <StatusBadge :tone="ACCOUNT_STATUS[store.accounts.gitee.status].tone">
                 {{ ACCOUNT_STATUS[store.accounts.gitee.status].label
                 }}{{ store.accounts.gitee.login ? ` @${store.accounts.gitee.login}` : "" }}
-              </Badge>
+              </StatusBadge>
             </span>
             <Button variant="outline" size="sm" @click="accountDialog = 'gitee'">
               {{ store.accounts.gitee.status === "unconfigured" ? "配置令牌" : "更新令牌" }}
@@ -101,7 +91,7 @@ async function changeDepth() {
             class="flex items-center gap-2 rounded-md border px-3 py-2"
           >
             <span class="flex-1 truncate font-mono text-xs">{{ root }}</span>
-            <Button variant="ghost" size="sm" class="h-6 text-muted-foreground hover:text-destructive" @click="removeRoot(root)">
+            <Button variant="ghost" size="sm" class="h-6 text-muted-foreground hover:text-destructive" @click="store.removeScanRoot(root)">
               ×
             </Button>
           </div>
@@ -117,7 +107,7 @@ async function changeDepth() {
           <select
             v-model="maxDepth"
             class="h-8 rounded-md border border-input bg-background px-2 text-xs"
-            @change="changeDepth"
+            @change="store.setMaxDepth(Number(maxDepth))"
           >
             <option value="2">2 层</option>
             <option value="3">3 层</option>

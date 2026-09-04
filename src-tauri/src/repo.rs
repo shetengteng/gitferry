@@ -35,7 +35,8 @@ pub fn parse_git_config(path: &Path) -> Vec<RemoteInfo> {
             current_remote = parse_section_remote_name(line);
             continue;
         }
-        let (Some(name), Some((key, value))) = (current_remote.as_ref(), line.split_once('=')) else {
+        let (Some(name), Some((key, value))) = (current_remote.as_ref(), line.split_once('='))
+        else {
             continue;
         };
         if key.trim() == "url" {
@@ -125,7 +126,10 @@ mod tests {
         assert_eq!(info("git@github.com:owner/repo.git"), HostKind::Github);
         assert_eq!(info("https://github.com/owner/repo.git"), HostKind::Github);
         assert_eq!(info("https://user@github.com/owner/repo"), HostKind::Github);
-        assert_eq!(info("ssh://git@ssh.github.com:443/owner/repo.git"), HostKind::Github);
+        assert_eq!(
+            info("ssh://git@ssh.github.com:443/owner/repo.git"),
+            HostKind::Github
+        );
         assert_eq!(info("git@gitee.com:owner/repo.git"), HostKind::Gitee);
         assert_eq!(info("https://gitee.com/owner/repo"), HostKind::Gitee);
         assert_eq!(info("https://gitlab.com/owner/repo.git"), HostKind::Other);
@@ -136,9 +140,15 @@ mod tests {
     #[test]
     fn url_host_handles_ports_and_users() {
         assert_eq!(url_host("https://github.com/a/b"), Some("github.com"));
-        assert_eq!(url_host("https://user@github.com:8443/a/b"), Some("github.com"));
+        assert_eq!(
+            url_host("https://user@github.com:8443/a/b"),
+            Some("github.com")
+        );
         assert_eq!(url_host("ssh://git@github.com/a/b"), Some("github.com"));
-        assert_eq!(url_host("git@gitee.com:22/owner/repo.git"), Some("gitee.com"));
+        assert_eq!(
+            url_host("git@gitee.com:22/owner/repo.git"),
+            Some("gitee.com")
+        );
         assert_eq!(url_host("file:///tmp/x"), None);
     }
 
@@ -177,7 +187,11 @@ mod tests {
         std::fs::create_dir_all(&worktree_root).unwrap();
         let real_gitdir = dir.path().join("main/.git/worktrees/wt");
         std::fs::create_dir_all(&real_gitdir).unwrap();
-        std::fs::write(worktree_root.join(".git"), format!("gitdir: {}\n", real_gitdir.display())).unwrap();
+        std::fs::write(
+            worktree_root.join(".git"),
+            format!("gitdir: {}\n", real_gitdir.display()),
+        )
+        .unwrap();
         assert_eq!(gitdir_for(&worktree_root), Some(real_gitdir));
     }
 

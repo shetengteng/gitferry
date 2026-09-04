@@ -151,7 +151,11 @@ mod tests {
 
     #[test]
     fn direction_serde_roundtrip() {
-        for d in [Direction::GithubToGitee, Direction::GiteeToGithub, Direction::Both] {
+        for d in [
+            Direction::GithubToGitee,
+            Direction::GiteeToGithub,
+            Direction::Both,
+        ] {
             let json = serde_json::to_string(&d).unwrap();
             let parsed: Direction = serde_json::from_str(&json).unwrap();
             assert_eq!(d, parsed);

@@ -90,6 +90,17 @@ export const useAppStore = defineStore("app", {
     async saveSettings(scanRoots: string[], maxDepth: number) {
       this.settings = await api.saveSettings(scanRoots, maxDepth);
     },
+    async addScanRoot(root: string) {
+      const roots = [...new Set([...this.settings.scan_roots, root])];
+      await this.saveSettings(roots, this.settings.max_depth);
+    },
+    async removeScanRoot(root: string) {
+      const roots = this.settings.scan_roots.filter((r) => r !== root);
+      await this.saveSettings(roots, this.settings.max_depth);
+    },
+    async setMaxDepth(maxDepth: number) {
+      await this.saveSettings([...this.settings.scan_roots], maxDepth);
+    },
     async configureAccount(platform: Platform, token: string) {
       const account = await api.configureAccount(platform, token);
       this.accounts[platform] = account;
