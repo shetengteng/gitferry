@@ -227,7 +227,7 @@
     transition: background-color 120ms;
   }
   .repo-row:hover { background: hsl(var(--accent) / 0.5); }
-  .repo-row.conflict { background: hsl(var(--warning) / 0.05); }
+  .repo-row.conflict { background: hsl(var(--warning) / 0.05); box-shadow: inset 2px 0 0 hsl(var(--warning)); }
   .repo-row.disabled { opacity: 0.45; }
   .repo-row-top { display: flex; align-items: center; gap: 8px; }
   .repo-name { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
@@ -387,6 +387,21 @@
   .note-card pre .s { color: hsl(var(--success)); }
   .note-card pre .w { color: hsl(var(--warning)); }
   .note-card pre .e { color: hsl(var(--destructive)); }
+
+  /* ============ 可访问性与交互打磨 ============ */
+  .rail-btn:focus-visible,
+  .tray-menu .item:focus-visible,
+  .root-chip .remove:focus-visible,
+  .select:focus-visible,
+  .checkbox:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+  .switch:focus-within .track { box-shadow: 0 0 0 2px hsl(var(--ring) / 0.4); }
+  .repo-meta, .statusbar, .global-status, .scan-progress .line { font-variant-numeric: tabular-nums; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
 </style>
 </head>
 <body>
