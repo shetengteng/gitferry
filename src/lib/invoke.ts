@@ -2,9 +2,12 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   Account,
   AppStatePayload,
+  ConflictSide,
   Direction,
   Platform,
   RepoEntry,
+  RepoSyncResult,
+  RepoSyncState,
   Settings,
 } from "./types";
 
@@ -33,8 +36,19 @@ export function setReposConfig(
 export function saveSettings(
   scanRoots: string[],
   maxDepth: number,
+  syncIntervalMins: number,
+  concurrency: number,
 ): Promise<Settings> {
-  return invoke("save_settings", { scanRoots, maxDepth });
+  return invoke("save_settings", {
+    scanRoots,
+    maxDepth,
+    syncIntervalMins,
+    concurrency,
+  });
+}
+
+export function revealLogsDir(): Promise<void> {
+  return invoke("reveal_logs_dir");
 }
 
 export function configureAccount(
@@ -46,4 +60,23 @@ export function configureAccount(
 
 export function completeSetup(): Promise<void> {
   return invoke("complete_setup");
+}
+
+export function syncNow(path: string): Promise<RepoSyncState> {
+  return invoke("sync_now", { path });
+}
+
+export function syncAll(): Promise<RepoSyncResult[]> {
+  return invoke("sync_all");
+}
+
+export function getSyncStates(): Promise<RepoSyncResult[]> {
+  return invoke("get_sync_states");
+}
+
+export function resolveConflict(
+  path: string,
+  side: ConflictSide,
+): Promise<RepoSyncState> {
+  return invoke("resolve_conflict", { path, side });
 }

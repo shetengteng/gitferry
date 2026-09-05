@@ -9,7 +9,7 @@ tools: Read, Edit, Write, Glob, Grep, Bash
 ## 必读
 
 动手前必读：
-- `docs/github-gitee-sync-design.md` §2（调研结论）、§4.3（同步算法）、§4.4（调度）、§5（冲突与安全边界）
+- `design/github-gitee-sync-design.md` §2（调研结论）、§4.3（同步算法）、§4.4（调度）、§5（冲突与安全边界）
 - `.trae/rules/safety.md`（安全红线，全部不可违反）
 - `src-tauri/src/repo.rs`、`src-tauri/src/scanner.rs`（现有领域代码风格）
 

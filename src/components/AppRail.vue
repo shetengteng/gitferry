@@ -11,7 +11,7 @@ const emit = defineEmits<{ navigate: [view: View] }>();
 
 const store = useAppStore();
 
-const NAV_ITEMS: { view: View; label: string; icon: typeof Ship }[] = [
+const NAV_ITEMS: { view: View; label: string; icon: typeof GitBranch }[] = [
   { view: "repos", label: "仓库", icon: GitBranch },
   { view: "settings", label: "设置", icon: Settings },
 ];
@@ -31,14 +31,13 @@ function itemClass(view: View) {
 </script>
 
 <template>
-  <nav class="flex w-48 shrink-0 flex-col gap-1 border-r bg-card px-2 py-3">
-    <div class="mb-3 flex items-center gap-2 px-1">
-      <div class="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+  <nav data-tauri-drag-region class="flex w-48 shrink-0 flex-col gap-1 border-r bg-card px-2 pb-3 pt-9">
+    <div class="mb-2 flex items-center gap-2 px-0.5">
+      <div class="flex size-[30px] shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
         <Ship class="size-4" />
       </div>
-      <span class="text-sm font-semibold tracking-tight">GitFerry</span>
+      <span class="text-[13px] font-semibold tracking-tight">GitFerry</span>
     </div>
-
     <button
       v-for="item in NAV_ITEMS"
       :key="item.view"

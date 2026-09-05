@@ -21,4 +21,4 @@ pnpm tauri build    # 打包 .dmg
 
 ## 设计文档
 
-[docs/github-gitee-sync-design.md](./docs/github-gitee-sync-design.md)
+[design/github-gitee-sync-design.md](./design/github-gitee-sync-design.md)

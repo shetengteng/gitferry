@@ -49,6 +49,20 @@ pub struct RepoEntry {
 pub struct Settings {
     pub scan_roots: Vec<PathBuf>,
     pub max_depth: u32,
+    /// 自动同步轮询间隔（分钟），调度器（M3）消费
+    #[serde(default = "default_sync_interval_mins")]
+    pub sync_interval_mins: u32,
+    /// 并发同步仓库数上限，调度器（M3）消费
+    #[serde(default = "default_concurrency")]
+    pub concurrency: u32,
+}
+
+fn default_sync_interval_mins() -> u32 {
+    10
+}
+
+fn default_concurrency() -> u32 {
+    2
 }
 
 impl Default for Settings {
@@ -63,6 +77,8 @@ impl Default for Settings {
         Self {
             scan_roots,
             max_depth: 4,
+            sync_interval_mins: default_sync_interval_mins(),
+            concurrency: default_concurrency(),
         }
     }
 }

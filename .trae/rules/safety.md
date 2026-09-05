@@ -1,6 +1,6 @@
 # 安全红线（全项目生效，不可协商）
 
-以下规则源自 `docs/github-gitee-sync-design.md` 的边界策略，任何代码改动不得违反。
+以下规则源自 `design/github-gitee-sync-design.md` 的边界策略，任何代码改动不得违反。
 
 ## 令牌与凭据
 

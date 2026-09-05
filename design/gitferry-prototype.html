@@ -209,13 +209,15 @@
 
   /* ============ 主界面布局 ============ */
   .page-header {
-    display: flex; align-items: center; gap: 8px;
+    display: flex; flex-direction: column; gap: 10px;
     padding: 18px 16px 14px; flex-shrink: 0;
   }
+  .page-header-top { display: flex; align-items: center; gap: 8px; }
+  .page-header-top .spacer { flex: 1; }
+  .page-header-subrow { display: flex; align-items: center; gap: 8px; }
+  .page-header-subrow .search { flex: 1; min-width: 0; }
   .page-title { font-size: 17px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.2; }
   .page-sub { font-size: 12px; color: hsl(var(--muted-foreground)); margin-top: 3px; }
-  .page-header .spacer { flex: 1; }
-  .page-header .search { width: 230px; flex: none; }
 
   .stat-row { display: flex; gap: 8px; padding: 0 16px 14px; flex-shrink: 0; }
   .stat {
@@ -553,14 +555,18 @@
         </div>
         <div class="main-col">
         <div class="page-header">
-          <div>
-            <div class="page-title">仓库</div>
-            <div class="page-sub">4 个启用 · 全部凭据就绪 · 上次同步 2 分钟前</div>
+          <div class="page-header-top">
+            <div>
+              <div class="page-title">仓库</div>
+              <div class="page-sub">4 个启用 · 全部凭据就绪 · 上次同步 2 分钟前</div>
+            </div>
+            <div class="spacer"></div>
+            <button class="btn btn-primary">立即全量同步</button>
           </div>
-          <div class="spacer"></div>
-          <input class="input search" placeholder="搜索仓库名或路径…">
-          <button class="btn btn-outline">重新扫描</button>
-          <button class="btn btn-primary">立即全量同步</button>
+          <div class="page-header-subrow">
+            <input class="input search" placeholder="搜索仓库名或路径…">
+            <button class="btn btn-outline">重新扫描</button>
+          </div>
         </div>
         <div class="stat-row">
           <div class="stat"><span class="dot" style="background: hsl(var(--success))"></span><span class="num">3</span><span class="label">已同步</span></div>
@@ -695,13 +701,17 @@
         </div>
         <div class="main-col">
         <div class="page-header">
-          <div>
-            <div class="page-title">仓库</div>
-            <div class="page-sub">同步中 · 1/4 仓库 · 并发 2</div>
+          <div class="page-header-top">
+            <div>
+              <div class="page-title">仓库</div>
+              <div class="page-sub">同步中 · 1/4 仓库 · 并发 2</div>
+            </div>
+            <div class="spacer"></div>
+            <button class="btn btn-primary">立即全量同步</button>
           </div>
-          <div class="spacer"></div>
-          <input class="input search" placeholder="搜索仓库名或路径…" value="deepseek">
-          <button class="btn btn-primary">立即全量同步</button>
+          <div class="page-header-subrow">
+            <input class="input search" placeholder="搜索仓库名或路径…" value="deepseek">
+          </div>
         </div>
         <div class="stat-row">
           <div class="stat"><span class="dot pulse" style="background: hsl(var(--info))"></span><span class="num">1</span><span class="label">同步中</span></div>

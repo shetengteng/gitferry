@@ -27,7 +27,7 @@ src-tauri/src/
   config.rs               # 配置读写（~/Library/Application Support/gitferry/config.json）
   error.rs                # FerryError / FerryResult
   logging.rs              # tracing 滚动文件日志
-docs/github-gitee-sync-design.md   # 设计文档（架构与同步算法的唯一权威来源）
+design/github-gitee-sync-design.md   # 设计文档（架构与同步算法的唯一权威来源）
 ```
 
 待开发模块（见设计文档 §4、§10 里程碑）：`sync.rs`（同步引擎，M2）、`scheduler.rs`（轮询调度，M3）、`autostart.rs`（自启，M3）。
@@ -37,7 +37,7 @@ docs/github-gitee-sync-design.md   # 设计文档（架构与同步算法的唯�
 - **前端只做展示与交互**：所有系统能力（文件扫描、git 操作、keyring、配置持久化）必须通过 Tauri command 走 Rust 侧，前端不直接访问文件系统/网络。
 - **Rust 侧不碰 UI**：command 返回序列化数据，不返回 HTML/样式；用户可见的文案错误用中文给出可操作提示。
 - **数据契约单一**：前后端共享的数据结构以 `src-tauri/src/config.rs` 的 serde 定义为准，前端 `src/lib/types.ts` 手工镜像对齐，字段名 snake_case。
-- **设计文档优先**：涉及同步算法、冲突策略、调度行为时，先读 `docs/github-gitee-sync-design.md`，不得偏离其中约定的安全边界。
+- **设计文档优先**：涉及同步算法、冲突策略、调度行为时，先读 `design/github-gitee-sync-design.md`，不得偏离其中约定的安全边界。
 
 ## 开发命令
 

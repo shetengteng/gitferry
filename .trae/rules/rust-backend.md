@@ -8,7 +8,7 @@ paths:
 
 ## 模块组织
 
-- 模块划分遵循 `docs/github-gitee-sync-design.md` §4：`commands.rs`（command 入口）、`scanner.rs`、`repo.rs`、`sync.rs`、`auth.rs`、`scheduler.rs`、`config.rs`、`logging.rs`、`autostart.rs`。
+- 模块划分遵循 `design/github-gitee-sync-design.md` §4：`commands.rs`（command 入口）、`scanner.rs`、`repo.rs`、`sync.rs`、`auth.rs`、`scheduler.rs`、`config.rs`、`logging.rs`、`autostart.rs`。
 - `commands.rs` 只做参数接收、状态读写与调度，具体逻辑下沉到领域模块（scanner/repo/sync 等），保持 command 层薄。
 - 新增模块在 `lib.rs` 中 `mod` 声明；新增 command 必须在 `lib.rs` 的 `generate_handler!` 中注册。
 

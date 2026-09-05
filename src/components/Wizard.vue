@@ -2,11 +2,13 @@
 import { computed, ref } from "vue";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { pickDirectory } from "@/lib/dialog";
 import { useAppStore } from "@/stores/app";
 
 const store = useAppStore();
 const step = ref<1 | 2>(1);
 const selected = ref<Set<string>>(new Set());
+const rootError = ref<string | null>(null);
 
 const KIND_LABEL: Record<string, string> = {
   both: "github + gitee",
@@ -35,6 +37,27 @@ function toggleAll() {
     selected.value = new Set();
   } else {
     selected.value = new Set(found.value.map((r) => r.path));
+  }
+}
+
+async function addRoot() {
+  rootError.value = null;
+  try {
+    const root = await pickDirectory();
+    if (root) {
+      await store.addScanRoot(root);
+    }
+  } catch (err) {
+    rootError.value = String(err);
+  }
+}
+
+async function removeRoot(root: string) {
+  rootError.value = null;
+  try {
+    await store.removeScanRoot(root);
+  } catch (err) {
+    rootError.value = String(err);
   }
 }
 
@@ -75,17 +98,27 @@ async function finish() {
       </p>
     </div>
 
-    <div v-if="step === 1" class="flex-1 space-y-2">
+    <div v-if="step === 1" class="flex-1 space-y-2 overflow-y-auto">
       <h3 class="text-xs font-semibold">扫描目录</h3>
       <div
         v-for="root in store.settings.scan_roots"
         :key="root"
-        class="flex items-center gap-2 rounded-md border px-3 py-2 font-mono text-xs"
+        class="flex items-center gap-2 rounded-md border px-3 py-2"
       >
-        {{ root }}
+        <span class="flex-1 truncate font-mono text-xs">{{ root }}</span>
+        <button
+          type="button"
+          class="text-sm leading-none text-muted-foreground outline-none transition-colors hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring"
+          title="移除该目录"
+          @click="removeRoot(root)"
+        >
+          ×
+        </button>
       </div>
+      <Button variant="outline" size="sm" @click="addRoot">＋ 添加目录…</Button>
+      <p v-if="rootError" class="text-[11px] text-destructive">{{ rootError }}</p>
       <p v-if="store.settings.scan_roots.length === 0" class="text-xs text-muted-foreground">
-        尚无扫描目录，请进入设置添加。
+        尚无扫描目录，请添加至少一个目录。
       </p>
       <p class="text-[11px] text-muted-foreground">
         默认深度 {{ store.settings.max_depth }} 层，自动跳过
@@ -94,13 +127,20 @@ async function finish() {
     </div>
 
     <div v-else class="flex-1 space-y-3 overflow-y-auto">
-      <div class="rounded-md border p-3">
+      <div class="space-y-2.5 rounded-lg border p-3.5">
         <div class="flex items-center justify-between text-xs">
           <span>扫描完成 · 发现 <b>{{ found.length }}</b> 个 git 仓库</span>
         </div>
+        <div class="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+          <div class="h-full w-[62%] rounded-full bg-success" />
+        </div>
+        <div class="font-mono text-[11px] text-muted-foreground">
+          已识别 remote：GitHub {{ store.kindStats.github }} · Gitee
+          {{ store.kindStats.gitee }} · 双端 {{ store.kindStats.both }}
+        </div>
       </div>
       <div class="flex items-center justify-between">
-        <h3 class="text-xs font-semibold">选择要启用的仓库</h3>
+        <h3 class="text-xs font-semibold">选择要启用的仓库（可稍后在主界面逐个开启）</h3>
         <Button variant="ghost" size="sm" @click="toggleAll">
           {{ allSelected ? "全不选" : "全选" }}
         </Button>
