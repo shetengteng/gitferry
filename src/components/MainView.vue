@@ -16,10 +16,20 @@ const view = ref<View>("repos");
 
 const conflictPath = ref<string | null>(null);
 const conflictOpen = ref(false);
+const mirrorError = ref<string | null>(null);
 
 function openConflict(path: string) {
   conflictPath.value = path;
   conflictOpen.value = true;
+}
+
+async function onMirror(path: string, value: boolean) {
+  mirrorError.value = null;
+  try {
+    await store.setRepoMirror(path, value);
+  } catch (err) {
+    mirrorError.value = `镜像模式保存失败：${String(err)}。请检查仓库配置后重试`;
+  }
 }
 
 const syncSummary = computed(() => {
@@ -111,6 +121,12 @@ async function rescan() {
         >
           {{ store.syncingError }}
         </p>
+        <p
+          v-if="mirrorError"
+          class="border-y border-destructive/25 bg-destructive/10 px-4 py-1.5 text-xs text-destructive"
+        >
+          {{ mirrorError }}
+        </p>
 
         <div class="flex flex-1 flex-col gap-2 overflow-y-auto px-4 pb-3.5">
           <p
@@ -127,6 +143,7 @@ async function rescan() {
             @change="store.setRepo"
             @sync="store.syncRepo"
             @conflict="openConflict"
+            @mirror="onMirror"
           />
         </div>
 

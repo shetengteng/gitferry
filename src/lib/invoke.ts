@@ -80,3 +80,7 @@ export function resolveConflict(
 ): Promise<RepoSyncState> {
   return invoke("resolve_conflict", { path, side });
 }
+
+export function setRepoMirror(path: string, mirrorDelete: boolean): Promise<void> {
+  return invoke("set_repo_mirror", { path, mirrorDelete });
+}

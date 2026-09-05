@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { askConfirm } from "@/lib/dialog";
 import StatusBadge from "./StatusBadge.vue";
 import type { Direction, RepoEntry, RepoSyncState, SyncStatus } from "@/lib/types";
 import { cn, formatRelativeTime } from "@/lib/utils";
@@ -22,6 +23,7 @@ const emit = defineEmits<{
   change: [path: string, enabled: boolean, direction: Direction];
   sync: [path: string];
   conflict: [path: string];
+  mirror: [path: string, value: boolean];
 }>();
 
 const KIND_LABEL: Record<RepoEntry["kind"], string> = {
@@ -112,6 +114,18 @@ function onDirection(value: unknown) {
     emit("change", props.repo.path, props.repo.enabled, value);
   }
 }
+
+/** 开启镜像删除需用户显式确认；取消则不 emit（model-value 单向绑定自动回弹） */
+async function toggleMirror(next: boolean) {
+  if (next) {
+    const ok = await askConfirm(
+      "开启镜像删除？",
+      "开启后自动同步将沿同步方向删除远端已不存在的分支与标签（双向时两端对称清理）。远端删除将同步生效，不可自动撤销。",
+    );
+    if (!ok) return;
+  }
+  emit("mirror", props.repo.path, next);
+}
 </script>
 
 <template>
@@ -160,6 +174,16 @@ function onDirection(value: unknown) {
         </SelectContent>
       </Select>
       <Input v-else class="h-7 w-40 text-[11px]" placeholder="先添加 remote（git remote add）" disabled />
+      <div
+        v-if="repo.enabled && repo.kind !== 'none'"
+        class="flex shrink-0 items-center gap-1.5"
+      >
+        <span class="whitespace-nowrap text-xs text-muted-foreground">镜像删除</span>
+        <Switch
+          :model-value="repo.mirror_delete"
+          @update:model-value="toggleMirror"
+        />
+      </div>
       <span
         class="shrink-0 whitespace-nowrap text-[11px] text-muted-foreground"
         :title="metaTitle"

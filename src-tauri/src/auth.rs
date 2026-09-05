@@ -27,6 +27,15 @@ pub fn set_token(platform: Platform, token: &str) -> FerryResult<()> {
     Ok(())
 }
 
+/// 从钥匙串读取平台令牌；未设置返回 None。令牌仅瞬时存在，不缓存、不落日志。
+pub fn get_token(platform: Platform) -> FerryResult<Option<String>> {
+    match keyring::Entry::new(SERVICE, platform.as_str())?.get_password() {
+        Ok(t) => Ok(Some(t)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(err) => Err(err.into()),
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum VerifyOutcome {
     /// 平台返回的登录名
@@ -61,7 +70,8 @@ pub async fn verify(platform: Platform, token: &str) -> VerifyOutcome {
             let body = resp.text().await.unwrap_or_default();
             parse_verify_response(status, &body)
         }
-        Err(err) => VerifyOutcome::Unexpected(err.to_string()),
+        // without_url：reqwest 错误会附带完整 URL，Gitee 令牌在 query 中，绝不外泄
+        Err(err) => VerifyOutcome::Unexpected(err.without_url().to_string()),
     }
 }
 

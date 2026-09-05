@@ -43,6 +43,9 @@ pub struct RepoEntry {
     pub direction: Direction,
     pub remotes: Vec<RemoteInfo>,
     pub kind: RepoKind,
+    /// 镜像模式：沿同步方向删除 dst 侧 src 已不存在的分支/tag（用户显式开启）
+    #[serde(default)]
+    pub mirror_delete: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -194,6 +197,7 @@ mod tests {
                     host: HostKind::Github,
                 }],
                 kind: RepoKind::GithubOnly,
+                mirror_delete: false,
             }],
             accounts: Accounts::default(),
             setup_done: true,
@@ -205,6 +209,33 @@ mod tests {
         assert!(parsed.setup_done);
         assert_eq!(parsed.repos.len(), 1);
         assert_eq!(parsed.repos[0].direction, Direction::GithubToGitee);
+    }
+
+    #[test]
+    fn mirror_delete_serde_default() {
+        // 旧配置 JSON 无 mirror_delete 字段 → 反序列化为 false
+        let legacy = r#"{
+            "path": "/tmp/repo",
+            "enabled": true,
+            "direction": "both",
+            "remotes": [],
+            "kind": "both"
+        }"#;
+        let parsed: RepoEntry = serde_json::from_str(legacy).unwrap();
+        assert!(!parsed.mirror_delete);
+
+        // 含 true 的 roundtrip 保留 true
+        let entry = RepoEntry {
+            path: PathBuf::from("/tmp/repo"),
+            enabled: true,
+            direction: Direction::Both,
+            remotes: Vec::new(),
+            kind: RepoKind::Both,
+            mirror_delete: true,
+        };
+        let raw = serde_json::to_string(&entry).unwrap();
+        let roundtrip: RepoEntry = serde_json::from_str(&raw).unwrap();
+        assert!(roundtrip.mirror_delete);
     }
 
     #[test]

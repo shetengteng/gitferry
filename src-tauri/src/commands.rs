@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{Manager, State};
 
 use crate::auth::{self, Platform};
 use crate::config::{Account, Accounts, Config, Direction, RepoEntry, Settings};
@@ -71,6 +71,7 @@ pub fn scan_repos(state: State<'_, SharedConfig>) -> FerryResult<Vec<RepoEntry>>
                         direction: existing.direction,
                         remotes,
                         kind,
+                        mirror_delete: existing.mirror_delete,
                     },
                     None => RepoEntry {
                         path,
@@ -78,6 +79,7 @@ pub fn scan_repos(state: State<'_, SharedConfig>) -> FerryResult<Vec<RepoEntry>>
                         direction: Direction::Both,
                         remotes,
                         kind,
+                        mirror_delete: false,
                     },
                 }
             })
@@ -192,7 +194,7 @@ pub fn complete_setup(state: State<'_, SharedConfig>) -> FerryResult<()> {
 // ---------- 同步（M2）：逻辑在 sync.rs，command 层只做状态读写与调度 ----------
 
 /// 锁同步状态表；中毒时取回内部数据继续（运行时状态允许降级）。
-fn lock_sync<'a>(
+pub(crate) fn lock_sync<'a>(
     sync: &'a State<'_, SharedSync>,
 ) -> MutexGuard<'a, HashMap<PathBuf, RepoSyncState>> {
     match sync.lock() {
@@ -225,7 +227,7 @@ fn ensure_enabled(entry: &RepoEntry, path: &str) -> FerryResult<()> {
 }
 
 /// 进入 syncing 状态；保留上次同步时间与未裁决冲突，清空上次错误。
-fn mark_syncing(sync: &State<'_, SharedSync>, path: &Path) {
+pub(crate) fn mark_syncing(sync: &State<'_, SharedSync>, path: &Path) {
     let mut map = lock_sync(sync);
     let prev = map.get(path).cloned();
     map.insert(
@@ -234,18 +236,55 @@ fn mark_syncing(sync: &State<'_, SharedSync>, path: &Path) {
             status: SyncStatus::Syncing,
             last_synced: prev.as_ref().and_then(|s| s.last_synced),
             pushed_refs: 0,
+            deleted_refs: 0,
             error: None,
             conflicts: prev.map(|s| s.conflicts).unwrap_or_default(),
         },
     );
 }
 
-fn store_state(sync: &State<'_, SharedSync>, path: &Path, state: RepoSyncState) {
+pub(crate) fn store_state(sync: &State<'_, SharedSync>, path: &Path, state: RepoSyncState) {
     lock_sync(sync).insert(path.to_path_buf(), state);
+}
+
+/// 将指定平台账号标记为令牌失效（调度器低频校验触发），持久化到配置。
+pub(crate) fn mark_account_invalid(
+    state: &State<'_, SharedConfig>,
+    platform: Platform,
+) -> FerryResult<()> {
+    mutate(state, |config| {
+        let account = match platform {
+            Platform::Github => &mut config.accounts.github,
+            Platform::Gitee => &mut config.accounts.gitee,
+        };
+        account.status = crate::config::AccountStatus::Invalid;
+        account.login = None;
+        Ok(())
+    })
+}
+
+/// 将当前全部同步状态广播给前端并刷新托盘（托盘刷新唯一入口）。
+pub(crate) fn emit_sync_states(app: &tauri::AppHandle) {
+    use tauri::Emitter;
+    let results: Vec<RepoSyncResult> = {
+        let sync_state = app.state::<SharedSync>();
+        let map = lock_sync(&sync_state);
+        map.iter()
+            .map(|(path, state)| RepoSyncResult {
+                path: path.to_string_lossy().into_owned(),
+                state: state.clone(),
+            })
+            .collect()
+    };
+    if let Err(err) = app.emit("sync-states-changed", &results) {
+        tracing::warn!(%err, "同步状态事件广播失败");
+    }
+    crate::tray::update(app);
 }
 
 #[tauri::command]
 pub async fn sync_now(
+    app: tauri::AppHandle,
     state: State<'_, SharedConfig>,
     sync: State<'_, SharedSync>,
     path: String,
@@ -272,38 +311,39 @@ pub async fn sync_now(
                     ..Default::default()
                 },
             );
+            emit_sync_states(&app);
             return Err(FerryError::msg(msg));
         }
     };
     store_state(&sync, &repo_path, new_state.clone());
+    emit_sync_states(&app);
     Ok(new_state)
 }
 
 #[tauri::command]
 pub async fn sync_all(
+    app: tauri::AppHandle,
     state: State<'_, SharedConfig>,
     sync: State<'_, SharedSync>,
 ) -> FerryResult<Vec<RepoSyncResult>> {
-    let (enabled, all_paths) = {
+    let (repos_snapshot, all_paths, concurrency) = {
         let config = state.lock().expect("config poisoned");
-        let enabled: Vec<RepoEntry> = config.repos.iter().filter(|r| r.enabled).cloned().collect();
+        let repos_snapshot: Vec<RepoEntry> = config.repos.clone();
         let all_paths: Vec<String> = config
             .repos
             .iter()
             .map(|r| r.path.to_string_lossy().into_owned())
             .collect();
-        (enabled, all_paths)
+        let concurrency = config.settings.concurrency.max(1) as usize;
+        (repos_snapshot, all_paths, concurrency)
     };
+    // 与调度轮同口径筛选（跳过 conflict/missing/syncing/无 remote），仅忽略退避
+    let enabled = crate::scheduler::select_manual(&app, &repos_snapshot);
     let enabled_paths: Vec<PathBuf> = enabled.iter().map(|e| e.path.clone()).collect();
-    for path in &enabled_paths {
-        mark_syncing(&sync, path);
-    }
-    // M2 顺序执行；并发限流由 M3 调度器引入
+    // 并发限流与状态写回统一由调度器的 execute_entries 完成
+    let app_for_task = app.clone();
     let join = tauri::async_runtime::spawn_blocking(move || {
-        enabled
-            .iter()
-            .map(|entry| (entry.path.clone(), sync::sync_repo(entry)))
-            .collect::<Vec<_>>()
+        crate::scheduler::execute_entries(&app_for_task, &enabled, concurrency)
     });
     let fresh = match join.await {
         Ok(results) => results,
@@ -322,12 +362,12 @@ pub async fn sync_all(
                     );
                 }
             }
+            emit_sync_states(&app);
             return Err(FerryError::msg(msg));
         }
     };
-    for (path, sync_state) in &fresh {
-        store_state(&sync, path, sync_state.clone());
-    }
+    tracing::info!(count = fresh.len(), "全量同步完成");
+    emit_sync_states(&app);
     // 返回全部仓库：已启用的取最新结果，未启用的保持既有状态（无记录按 pending）
     let mut results = Vec::with_capacity(all_paths.len());
     {
@@ -340,7 +380,6 @@ pub async fn sync_all(
             });
         }
     }
-    tracing::info!(total = results.len(), "全量同步完成");
     Ok(results)
 }
 
@@ -359,6 +398,7 @@ pub fn get_sync_states(sync: State<'_, SharedSync>) -> Vec<RepoSyncResult> {
 /// 随后重新执行一次同步。这是全项目唯一允许 --force 的路径。
 #[tauri::command]
 pub async fn resolve_conflict(
+    app: tauri::AppHandle,
     state: State<'_, SharedConfig>,
     sync: State<'_, SharedSync>,
     path: String,
@@ -397,10 +437,12 @@ pub async fn resolve_conflict(
                     status: SyncStatus::Error,
                     last_synced: None,
                     pushed_refs: 0,
+                    deleted_refs: 0,
                     error: Some(err.to_string()),
                     conflicts,
                 },
             );
+            emit_sync_states(&app);
             return Err(err);
         }
         Err(err) => {
@@ -415,9 +457,29 @@ pub async fn resolve_conflict(
                     ..Default::default()
                 },
             );
+            emit_sync_states(&app);
             return Err(FerryError::msg(msg));
         }
     };
     store_state(&sync, &PathBuf::from(&path), new_state.clone());
+    emit_sync_states(&app);
     Ok(new_state)
+}
+
+/// 设置单仓库镜像删除开关（用户显式选择，默认 false）。
+#[tauri::command]
+pub fn set_repo_mirror(
+    state: State<'_, SharedConfig>,
+    path: String,
+    mirror_delete: bool,
+) -> FerryResult<()> {
+    mutate(&state, |config| {
+        let entry = config
+            .repos
+            .iter_mut()
+            .find(|r| r.path == PathBuf::from(&path))
+            .ok_or_else(|| FerryError::msg(format!("仓库未收录：{path}")))?;
+        entry.mirror_delete = mirror_delete;
+        Ok(())
+    })
 }

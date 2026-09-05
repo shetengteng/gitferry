@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { pickDirectory } from "@/lib/dialog";
 import { useAppStore } from "@/stores/app";
 import { useTheme } from "@/composables/useTheme";
@@ -61,6 +62,14 @@ async function revealLogs() {
   } finally {
     revealing.value = false;
   }
+}
+
+onMounted(() => {
+  store.refreshAutostart();
+});
+
+async function toggleAutostart(checked: boolean) {
+  await store.toggleAutostart(checked);
 }
 </script>
 
@@ -184,6 +193,22 @@ async function revealLogs() {
             <option value="3">3</option>
             <option value="4">4</option>
           </select>
+        </section>
+
+        <section class="flex items-center justify-between">
+          <div class="space-y-0.5">
+            <span class="text-sm">开机自启</span>
+            <p class="text-[11px] text-muted-foreground">
+              登录后自动启动 GitFerry。正式版安装后请重新开关一次以更新启动路径
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span v-if="store.autostartError" class="text-[11px] text-destructive">{{ store.autostartError }}</span>
+            <Switch
+              :model-value="store.autostartEnabled"
+              @update:model-value="toggleAutostart"
+            />
+          </div>
         </section>
 
         <section class="flex items-center justify-between">

@@ -51,6 +51,9 @@ pub struct RepoSyncState {
     pub status: SyncStatus,
     pub last_synced: Option<i64>,
     pub pushed_refs: u32,
+    /// 本次同步沿镜像模式删除的 ref 数
+    #[serde(default)]
+    pub deleted_refs: u32,
     pub error: Option<String>,
     pub conflicts: Vec<RefConflict>,
 }
@@ -112,6 +115,8 @@ impl Remotes {
 #[derive(Default)]
 struct Acc {
     pushed: u32,
+    /// 镜像模式删除的 ref 数
+    deleted: u32,
     conflicts: Vec<RefConflict>,
     errors: Vec<String>,
     /// 本地分支与远端分叉（只置状态，不进 conflicts：该分歧无法由两端对齐解决）
@@ -201,7 +206,7 @@ pub fn sync_repo(entry: &RepoEntry) -> RepoSyncState {
     local_three_way(&root, &rounds, &remotes, &mut acc);
     // 3. 逐方向远端对齐：分支 fast-forward 同步 + tag 补推 / 漂移检测
     for round in rounds {
-        round_refs(&root, round, &remotes, &mut acc);
+        round_refs(&root, round, &remotes, &mut acc, entry.mirror_delete);
     }
     finish(acc, started, &root)
 }
@@ -402,7 +407,8 @@ fn pull_ff_only(root: &Path, remote: &str, branch: &str, acc: &mut Acc) {
 }
 
 /// 单方向远端对齐：逐分支 fast-forward 同步 + tag 补推 / 漂移检测。
-fn round_refs(root: &Path, round: Round, remotes: &Remotes, acc: &mut Acc) {
+/// mirror_delete 为 true 时，额外删除 dst 侧 src 已不存在的分支/tag（用户显式开启的镜像模式）。
+fn round_refs(root: &Path, round: Round, remotes: &Remotes, acc: &mut Acc, mirror_delete: bool) {
     let (src, dst) = (remotes.of(round.src), remotes.of(round.dst));
     let src_branches = match list_remote_branches(root, src) {
         Ok(m) => m,
@@ -473,6 +479,22 @@ fn round_refs(root: &Path, round: Round, remotes: &Remotes, acc: &mut Acc) {
             }
         }
     }
+    // 镜像模式：dst 侧存在而 src 确认不存在的分支 → 沿 round 方向单向删除。
+    // src/dst 列表任一获取失败时已在上方提前 return，不会在 Err 路径做删除。
+    if mirror_delete {
+        for branch in dst_branches.keys() {
+            if !src_branches.contains_key(branch) {
+                push_delete(
+                    root,
+                    dst,
+                    &format!("refs/heads/{branch}"),
+                    RefKind::Branch,
+                    branch,
+                    acc,
+                );
+            }
+        }
+    }
     // tag：本地 refs/tags 命名空间无法区分来自哪端（两端 tag 混在同一命名空间，
     // auto-follow 也不覆盖已有 tag），故用 ls-remote 分别读取两端真实 tag refs。
     // 以 peeled sha 比较「指向」；补推时用 ref sha 以保留 annotated tag 对象。
@@ -521,6 +543,21 @@ fn round_refs(root: &Path, round: Round, remotes: &Remotes, acc: &mut Acc) {
             ),
         }
     }
+    // 镜像模式：dst 侧存在而 src 确认不存在的 tag → 单向删除
+    if mirror_delete {
+        for tag in dst_tags.keys() {
+            if !src_tags.contains_key(tag) {
+                push_delete(
+                    root,
+                    dst,
+                    &format!("refs/tags/{tag}"),
+                    RefKind::Tag,
+                    tag,
+                    acc,
+                );
+            }
+        }
+    }
 }
 
 /// 推送显式 refspec（`<sha>:<target>`，无 --force），按输出判定结果。
@@ -554,6 +591,28 @@ fn push_explicit(
             } else {
                 acc.errors.push(classify_git_error(remote, &stderr));
             }
+        }
+        Err(err) => acc.errors.push(err.to_string()),
+    }
+}
+
+/// 镜像模式：删除 dst 侧 src 已不存在的 ref（显式 refspec，绝不 --mirror 裸推）。
+/// 删除失败按 error 处理，不静默。
+fn push_delete(root: &Path, remote: &str, target: &str, kind: RefKind, name: &str, acc: &mut Acc) {
+    match run_git(root, &["push", remote, "--delete", target]) {
+        Ok(out) if out.status.success() => {
+            acc.deleted += 1;
+            tracing::info!(
+                path = %root.display(),
+                remote,
+                kind = ?kind,
+                name,
+                "镜像模式删除远端 ref"
+            );
+        }
+        Ok(out) => {
+            acc.errors
+                .push(classify_git_error(remote, &stderr_of(&out)));
         }
         Err(err) => acc.errors.push(err.to_string()),
     }
@@ -610,6 +669,7 @@ fn finish(acc: Acc, started: Instant, root: &Path) -> RepoSyncState {
         status,
         last_synced,
         pushed_refs: acc.pushed,
+        deleted_refs: acc.deleted,
         error,
         conflicts: acc.conflicts,
     };
@@ -617,6 +677,7 @@ fn finish(acc: Acc, started: Instant, root: &Path) -> RepoSyncState {
         path = %root.display(),
         status = ?state.status,
         pushed = state.pushed_refs,
+        deleted = state.deleted_refs,
         conflicts = state.conflicts.len(),
         elapsed_ms = started.elapsed().as_millis() as u64,
         "同步完成"
@@ -895,6 +956,7 @@ mod tests {
                 },
             ],
             kind: RepoKind::Both,
+            mirror_delete: false,
         }
     }
 
@@ -1088,6 +1150,7 @@ mod tests {
             direction: Direction::Both,
             remotes: Vec::new(),
             kind: RepoKind::None,
+            mirror_delete: false,
         };
         let state = sync_repo(&entry);
         assert_eq!(state.status, SyncStatus::Missing);
@@ -1193,6 +1256,118 @@ mod tests {
     }
 
     #[test]
+    fn mirror_delete_propagates_branch_deletion() {
+        let env = setup();
+        git_ok(&env.work, &["switch", "-c", "feature"]);
+        git_ok(&env.work, &["commit", "--allow-empty", "-m", "f1"]);
+        git_ok(
+            &env.work,
+            &["push", "github", "refs/heads/feature:refs/heads/feature"],
+        );
+        git_ok(&env.work, &["switch", "main"]);
+        // 先同步一次，让 gitee 也有 feature
+        let state = sync_repo(&entry(&env, Direction::Both));
+        assert_eq!(state.status, SyncStatus::Synced);
+        assert!(bare_sha(&env.gitee, "refs/heads/feature").is_some());
+
+        // 从 github 删除 feature（模拟上游删分支）
+        git_ok(&env.github, &["update-ref", "-d", "refs/heads/feature"]);
+
+        let mut e = entry(&env, Direction::Both);
+        e.mirror_delete = true;
+        let state = sync_repo(&e);
+        assert_eq!(state.status, SyncStatus::Synced);
+        assert!(state.conflicts.is_empty());
+        assert!(state.deleted_refs >= 1);
+        assert!(bare_sha(&env.github, "refs/heads/feature").is_none());
+        assert!(bare_sha(&env.gitee, "refs/heads/feature").is_none());
+    }
+
+    #[test]
+    fn mirror_delete_propagates_tag_deletion() {
+        let env = setup();
+        git_ok(&env.work, &["tag", "v1"]);
+        git_ok(&env.work, &["push", "github", "refs/tags/v1:refs/tags/v1"]);
+        // 先同步一次，让 gitee 也有 v1
+        let state = sync_repo(&entry(&env, Direction::GithubToGitee));
+        assert_eq!(state.status, SyncStatus::Synced);
+        assert!(bare_sha(&env.gitee, "refs/tags/v1").is_some());
+
+        // 从 github 删除 v1（模拟上游删 tag）
+        git_ok(&env.github, &["update-ref", "-d", "refs/tags/v1"]);
+
+        let mut e = entry(&env, Direction::Both);
+        e.mirror_delete = true;
+        let state = sync_repo(&e);
+        assert_eq!(state.status, SyncStatus::Synced);
+        assert!(state.deleted_refs >= 1);
+        assert!(bare_sha(&env.github, "refs/tags/v1").is_none());
+        assert!(bare_sha(&env.gitee, "refs/tags/v1").is_none());
+    }
+
+    #[test]
+    fn mirror_delete_disabled_keeps_refs() {
+        let env = setup();
+        git_ok(&env.work, &["switch", "-c", "feature"]);
+        git_ok(&env.work, &["commit", "--allow-empty", "-m", "f1"]);
+        git_ok(
+            &env.work,
+            &["push", "github", "refs/heads/feature:refs/heads/feature"],
+        );
+        git_ok(&env.work, &["switch", "main"]);
+        let state = sync_repo(&entry(&env, Direction::Both));
+        assert_eq!(state.status, SyncStatus::Synced);
+
+        git_ok(&env.github, &["update-ref", "-d", "refs/heads/feature"]);
+
+        // mirror_delete 默认 false：gitee 侧 feature 保留
+        let e = entry(&env, Direction::Both);
+        assert!(!e.mirror_delete);
+        let state = sync_repo(&e);
+        assert_eq!(state.status, SyncStatus::Synced);
+        assert_eq!(state.deleted_refs, 0);
+        assert!(bare_sha(&env.gitee, "refs/heads/feature").is_some());
+    }
+
+    #[test]
+    fn mirror_delete_both_directions_symmetric() {
+        let env = setup();
+        // github 独有分支 a，gitee 独有分支 b
+        git_ok(&env.work, &["switch", "-c", "a"]);
+        git_ok(&env.work, &["commit", "--allow-empty", "-m", "a1"]);
+        git_ok(&env.work, &["push", "github", "refs/heads/a:refs/heads/a"]);
+        git_ok(&env.work, &["switch", "-c", "b"]);
+        git_ok(&env.work, &["commit", "--allow-empty", "-m", "b1"]);
+        git_ok(&env.work, &["push", "gitee", "refs/heads/b:refs/heads/b"]);
+        git_ok(&env.work, &["switch", "main"]);
+
+        let mut e = entry(&env, Direction::Both);
+        e.mirror_delete = true;
+
+        // 第一次同步：github→gitee 轮传播 a、删除 gitee 独有的 b。
+        // git push 会同步更新 remote-tracking ref，反向轮基于最新状态、无需再删。
+        let state = sync_repo(&e);
+        assert_eq!(state.status, SyncStatus::Synced);
+        assert_eq!(state.deleted_refs, 1);
+        assert!(bare_sha(&env.gitee, "refs/heads/b").is_none());
+        assert_eq!(
+            bare_sha(&env.gitee, "refs/heads/a"),
+            bare_sha(&env.github, "refs/heads/a")
+        );
+
+        // 从 github 删除 a → 第二次同步沿 github→gitee 方向把删除传播到 gitee
+        git_ok(&env.github, &["update-ref", "-d", "refs/heads/a"]);
+        let state = sync_repo(&e);
+        assert_eq!(state.status, SyncStatus::Synced);
+        assert_eq!(state.deleted_refs, 1);
+        // 对称收敛：两端 bare 均只剩 main
+        assert!(bare_sha(&env.github, "refs/heads/a").is_none());
+        assert!(bare_sha(&env.gitee, "refs/heads/a").is_none());
+        assert!(bare_sha(&env.github, "refs/heads/main").is_some());
+        assert!(bare_sha(&env.gitee, "refs/heads/main").is_some());
+    }
+
+    #[test]
     fn classifies_git_errors_to_actionable_messages() {
         let auth = classify_git_error(
             "github",
@@ -1238,6 +1413,7 @@ mod tests {
         .unwrap();
         assert_eq!(state.status, SyncStatus::Conflict);
         assert_eq!(state.pushed_refs, 2);
+        assert_eq!(state.deleted_refs, 0);
         assert_eq!(state.conflicts[0].kind, RefKind::Tag);
         assert_eq!(state.conflicts[0].github_sha, "aaaaaaa");
     }

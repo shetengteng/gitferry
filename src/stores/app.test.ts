@@ -4,6 +4,7 @@ import { useAppStore } from "./app";
 import type {
   AppStatePayload,
   RepoEntry,
+  RepoSyncResult,
   RepoSyncState,
 } from "@/lib/types";
 
@@ -12,6 +13,7 @@ vi.mock("@/lib/invoke", () => ({
   scanRepos: vi.fn(),
   setRepoConfig: vi.fn().mockResolvedValue(undefined),
   setReposConfig: vi.fn().mockResolvedValue(undefined),
+  setRepoMirror: vi.fn(),
   saveSettings: vi.fn(),
   revealLogsDir: vi.fn().mockResolvedValue(undefined),
   configureAccount: vi.fn(),
@@ -22,7 +24,12 @@ vi.mock("@/lib/invoke", () => ({
   resolveConflict: vi.fn(),
 }));
 
+vi.mock("@/lib/events", () => ({
+  listenSyncStates: vi.fn(async () => () => {}),
+}));
+
 import * as api from "@/lib/invoke";
+import * as eventsApi from "@/lib/events";
 
 function repo(path: string, overrides: Partial<RepoEntry> = {}): RepoEntry {
   return {
@@ -31,6 +38,7 @@ function repo(path: string, overrides: Partial<RepoEntry> = {}): RepoEntry {
     direction: "both",
     remotes: [],
     kind: "both",
+    mirror_delete: false,
     ...overrides,
   };
 }
@@ -40,6 +48,7 @@ function syncState(overrides: Partial<RepoSyncState> = {}): RepoSyncState {
     status: "pending",
     last_synced: null,
     pushed_refs: 0,
+    deleted_refs: 0,
     error: null,
     conflicts: [],
     ...overrides,
@@ -60,11 +69,56 @@ function appState(overrides: Partial<AppStatePayload> = {}): AppStatePayload {
 }
 
 const mockedApi = vi.mocked(api);
+const mockedEvents = vi.mocked(eventsApi);
 
 beforeEach(() => {
   setActivePinia(createPinia());
   vi.clearAllMocks();
   mockedApi.getSyncStates.mockResolvedValue([]);
+});
+
+describe("setRepoMirror", () => {
+  it("成功时更新本地仓库 mirror_delete", async () => {
+    const store = useAppStore();
+    store.repos = [repo("~/a/x"), repo("~/b/y")];
+    mockedApi.setRepoMirror.mockResolvedValueOnce(undefined);
+    await store.setRepoMirror("~/a/x", true);
+    expect(mockedApi.setRepoMirror).toHaveBeenCalledWith("~/a/x", true);
+    expect(store.repos[0].mirror_delete).toBe(true);
+    expect(store.repos[1].mirror_delete).toBe(false);
+  });
+
+  it("失败时抛出错误且不改本地状态", async () => {
+    const store = useAppStore();
+    store.repos = [repo("~/a/x")];
+    mockedApi.setRepoMirror.mockRejectedValueOnce("保存配置失败：磁盘不可写");
+    await expect(store.setRepoMirror("~/a/x", true)).rejects.toBe(
+      "保存配置失败：磁盘不可写",
+    );
+    expect(store.repos[0].mirror_delete).toBe(false);
+  });
+});
+
+describe("bindSyncEvents", () => {
+  it("事件回调按 merge 语义更新 syncStates，其余仓库保留", async () => {
+    const store = useAppStore();
+    let fire: ((results: RepoSyncResult[]) => void) | undefined;
+    mockedEvents.listenSyncStates.mockImplementationOnce(async (cb) => {
+      fire = cb;
+      return () => {};
+    });
+    mockedApi.getAppState.mockResolvedValueOnce(
+      appState({ repos: [repo("~/a/x")] }),
+    );
+    mockedApi.getSyncStates.mockResolvedValueOnce([
+      { path: "~/b/y", state: syncState({ status: "synced", last_synced: 1 }) },
+    ]);
+    await store.init();
+    expect(fire).toBeTypeOf("function");
+    fire!([{ path: "~/a/x", state: syncState({ status: "error", error: "push 被拒" }) }]);
+    expect(store.syncStates["~/b/y"].status).toBe("synced");
+    expect(store.syncStates["~/a/x"].status).toBe("error");
+  });
 });
 
 describe("visibleRepos", () => {

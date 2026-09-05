@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import * as api from "@/lib/invoke";
+import { listenSyncStates } from "@/lib/events";
 import type {
   Account,
   ConflictSide,
@@ -25,6 +26,9 @@ interface AppState {
   syncingError: string | null;
   /** 最近一次全量同步成功的时间（毫秒时间戳），null 表示尚未全量同步过 */
   lastSyncAllAt: number | null;
+  /** 开机自启是否已启用（读自系统登录项） */
+  autostartEnabled: boolean;
+  autostartError: string | null;
 }
 
 export interface RepoStats {
@@ -46,6 +50,9 @@ function resultsToStates(results: RepoSyncResult[]): Record<string, RepoSyncStat
   return map;
 }
 
+/** sync-states-changed 事件的解除订阅函数；存于 store 外部，防重复订阅 */
+let unlistenSyncStates: (() => void) | null = null;
+
 export const useAppStore = defineStore("app", {
   state: (): AppState => ({
     loaded: false,
@@ -63,6 +70,8 @@ export const useAppStore = defineStore("app", {
     syncingAll: false,
     syncingError: null,
     lastSyncAllAt: null,
+    autostartEnabled: false,
+    autostartError: null,
   }),
   getters: {
     enabledCount: (s) => s.repos.filter((r) => r.enabled).length,
@@ -118,6 +127,8 @@ export const useAppStore = defineStore("app", {
   },
   actions: {
     async init() {
+      // 先订阅事件再拉取初始数据，避免「拉取完成前状态变更事件丢失」的竞态
+      await this.bindSyncEvents();
       const [state] = await Promise.all([
         api.getAppState(),
         api
@@ -134,6 +145,23 @@ export const useAppStore = defineStore("app", {
       this.settings = state.settings;
       this.accounts = state.accounts;
       this.loaded = true;
+    },
+    /** 订阅后端 sync-states-changed 事件；重复调用先释放旧订阅（HMR / 重复 init 安全） */
+    async bindSyncEvents() {
+      if (unlistenSyncStates) {
+        unlistenSyncStates();
+        unlistenSyncStates = null;
+      }
+      unlistenSyncStates = await listenSyncStates((results) => {
+        // merge 语义：只覆盖事件携带的仓库，其余仓库状态保留
+        this.syncStates = { ...this.syncStates, ...resultsToStates(results) };
+      });
+    },
+    /** 开关单个仓库的镜像删除模式；失败时抛出且不改本地状态 */
+    async setRepoMirror(path: string, mirrorDelete: boolean) {
+      await api.setRepoMirror(path, mirrorDelete);
+      const repo = this.repos.find((r) => r.path === path);
+      if (repo) repo.mirror_delete = mirrorDelete;
     },
     async scan() {
       this.scanning = true;
@@ -225,6 +253,31 @@ export const useAppStore = defineStore("app", {
     async revealLogs() {
       await api.revealLogsDir();
     },
+    /** 读取系统登录项中的开机自启状态（设置页挂载时调用） */
+    async refreshAutostart() {
+      try {
+        const { isEnabled } = await import("@tauri-apps/plugin-autostart");
+        this.autostartEnabled = await isEnabled();
+        this.autostartError = null;
+      } catch (err) {
+        this.autostartError = `读取自启状态失败：${String(err)}。请重启应用后重试`;
+      }
+    },
+    /** 开关开机自启；失败时写 autostartError，开关经单向绑定回弹 */
+    async toggleAutostart(enabled: boolean) {
+      this.autostartError = null;
+      try {
+        const plugin = await import("@tauri-apps/plugin-autostart");
+        if (enabled) {
+          await plugin.enable();
+        } else {
+          await plugin.disable();
+        }
+        this.autostartEnabled = enabled;
+      } catch (err) {
+        this.autostartError = `${enabled ? "开启" : "关闭"}自启失败：${String(err)}。请确认系统设置允许 GitFerry 作为登录项，然后重试`;
+      }
+    },
     async configureAccount(platform: Platform, token: string) {
       const account = await api.configureAccount(platform, token);
       this.accounts[platform] = account;
@@ -239,6 +292,7 @@ export const useAppStore = defineStore("app", {
         status: "syncing",
         last_synced: prev?.last_synced ?? null,
         pushed_refs: prev?.pushed_refs ?? 0,
+        deleted_refs: prev?.deleted_refs ?? 0,
         error: null,
         conflicts: prev?.conflicts ?? [],
       };
@@ -249,6 +303,7 @@ export const useAppStore = defineStore("app", {
           status: "error",
           last_synced: prev?.last_synced ?? null,
           pushed_refs: prev?.pushed_refs ?? 0,
+          deleted_refs: prev?.deleted_refs ?? 0,
           error: String(err),
           conflicts: prev?.conflicts ?? [],
         };
@@ -264,6 +319,7 @@ export const useAppStore = defineStore("app", {
           status: "syncing",
           last_synced: prev?.last_synced ?? null,
           pushed_refs: prev?.pushed_refs ?? 0,
+          deleted_refs: prev?.deleted_refs ?? 0,
           error: null,
           conflicts: prev?.conflicts ?? [],
         };
@@ -283,6 +339,7 @@ export const useAppStore = defineStore("app", {
         status: "syncing",
         last_synced: prev?.last_synced ?? null,
         pushed_refs: prev?.pushed_refs ?? 0,
+        deleted_refs: prev?.deleted_refs ?? 0,
         error: null,
         conflicts: prev?.conflicts ?? [],
       };

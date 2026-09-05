@@ -18,6 +18,8 @@ export interface RepoEntry {
   direction: Direction;
   remotes: RemoteInfo[];
   kind: RepoKind;
+  /** 镜像模式——沿同步方向删除对端多余分支/标签，用户显式开启 */
+  mirror_delete: boolean;
 }
 
 export interface Settings {
@@ -71,6 +73,8 @@ export interface RepoSyncState {
   status: SyncStatus;
   last_synced: number | null;
   pushed_refs: number;
+  /** 本次镜像删除的 ref 数 */
+  deleted_refs: number;
   error: string | null;
   conflicts: RefConflict[];
 }
