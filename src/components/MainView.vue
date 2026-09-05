@@ -74,20 +74,20 @@ async function rescan() {
               <div class="text-[17px] font-semibold leading-tight tracking-tight">仓库</div>
               <div class="mt-0.5 text-xs text-muted-foreground">{{ pageSub }}</div>
             </div>
-            <div class="flex-1" />
-            <Button
-              :disabled="store.syncingAll || store.enabledCount === 0"
-              :title="store.enabledCount === 0 ? '没有已启用的仓库' : undefined"
-              @click="store.syncAll"
-            >
-              <Loader2 v-if="store.syncingAll" class="mr-1 h-3.5 w-3.5 animate-spin" />
-              {{ store.syncingAll ? "同步中…" : "立即全量同步" }}
-            </Button>
           </div>
           <div class="flex items-center gap-2">
             <Input v-model="store.query" class="h-8 flex-1 text-xs" placeholder="搜索仓库名或路径…" />
             <Button variant="outline" size="sm" :disabled="store.scanning" @click="rescan">
               {{ store.scanning ? "扫描中…" : "重新扫描" }}
+            </Button>
+            <Button
+              size="sm"
+              :disabled="store.syncingAll || store.enabledCount === 0"
+              :title="store.enabledCount === 0 ? '没有已启用的仓库' : undefined"
+              @click="store.syncAll"
+            >
+              <Loader2 v-if="store.syncingAll" class="mr-1 h-3 w-3 animate-spin" />
+              {{ store.syncingAll ? "同步中…" : "立即全量同步" }}
             </Button>
           </div>
         </div>
